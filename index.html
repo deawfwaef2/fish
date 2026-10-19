@@ -163,8 +163,8 @@
       { id:'reed', name:'芦苇短竿', rarity:'粗糙', desc:'一根能用的鱼竿。没有辅助界面，也拉不动大鱼。', power:2.1, ui:0, cost:{} },
       { id:'bronze', name:'青铜逆流竿', rarity:'精良 · 力量', desc:'提升拉力，解锁常驻排行榜和基础瞄准环。', power:3.6, ui:1, cost:{silver:8,blue:4} },
       { id:'tide', name:'逐潮探鱼仪', rarity:'稀有 · 感知', desc:'鱼口预判提示、河岸聊天窗与晶蓝外框。', power:5.5, ui:2, cost:{perch:7,carp:3,eel:2} },
-      { id:'abyss', name:'深渊牵星套装', rarity:'史诗 · 深渊', desc:'更强收线与金色豪华边框，可以挑战深水巨鱼。', power:8.0, ui:3, cost:{puffer:5,ray:3,shark:2} },
-      { id:'crown', name:'潮汐王冠', rarity:'传说 · 统御', desc:'最终形态：最强拉力、稀有鱼辉光与王冠视觉。', power:12.0, ui:4, cost:{angler:3,leviathan:1,shark:3} }
+      { id:'abyss', name:'深渊牵星套装', rarity:'史诗 · 深渊', desc:'更强收线与金色豪华边框，终于可以挑战渊流巨鱼。', power:10.5, ui:3, cost:{puffer:5,ray:3,shark:2} },
+      { id:'crown', name:'潮汐王冠', rarity:'传说 · 统御', desc:'最终形态：最强拉力、稀有鱼辉光与王冠视觉。', power:14.0, ui:4, cost:{angler:3,leviathan:1,shark:3} }
     ];
     const botNames = ['晚风来信','鲤鱼跃电门','AquaX','钓到月亮','小河豚','NullPointer','咸鱼不翻身','鱼见愁','北岸七号','深蓝回声','阿岚','海盐汽水','鱼塘策士','旧码头','星尘钩手','团子同学','拾光','乌云背后','青柠薄荷','摸鱼专家','浪里白条','石桥客','流萤','白噪音','潮生','捞月人','竹影','阿瓦达大鱼','偏爱浅滩','海边的猫','极夜','鱼竿没电','青空','迴游','白鸥','下班就钓鱼','永远空军','深海来客'];
     const titles = ['见习钓手','岸边旅人','摸鱼大师','逆流猎人','蓝鳍传说','满载而归','空军指挥官','潮汐观测员','河道冠军','深水漫游者'];
@@ -202,8 +202,14 @@
     function riverLeft(y) { return W * .19 + Math.sin(y * .0045 + .4) * Math.min(23,W*.022); }
     function riverRight(y) { return W * .83 + Math.sin(y * .0045 + .4) * Math.min(23,W*.022); }
     function isWater(x,y) { return x > riverLeft(y)+10 && x < riverRight(y)-10 && y > 24 && y < H-20; }
-    function rodBase() { return {x:W*.92,y:H*.90}; }
-    function rodTip() { return {x:W*.79,y:H*.49}; }
+    function rodBase() { return {x:W*.93,y:H*.92}; }
+    function rodPose() {
+      const power=charge?.power||0;
+      const whip=cast?.phase==='flying'?Math.sin(Math.PI*clamp(cast.time/cast.duration,0,1)):0;
+      const struggle=hooked?Math.sin(ambientClock*12)*5:0;
+      return {base:rodBase(),tip:{x:W*.76+power*20-whip*49+struggle,y:H*.45+power*16-whip*26+struggle*.6},power};
+    }
+    function rodTip() { return rodPose().tip; }
     function pickSpecies() {
       const pool = species.filter(s => s.tier <= Math.min(stage+1,4));
       const total = pool.reduce((n,s) => n + s.weight * (s.tier > stage ? .06 : 1),0);
@@ -214,7 +220,9 @@
     function createFish(initial=false) {
       const kind = pickSpecies();
       const y = initial ? rand(-H*.14,H+H*.12) : -kind.size*2-rand(0,80);
-      const x = rand(riverLeft(y)+kind.size*.9,riverRight(y)-kind.size*.9);
+      const left=riverLeft(y),right=riverRight(y);
+      const margin=Math.min(kind.size*.9,(right-left)*.39);
+      const x=rand(left+margin,right-margin);
       return {id:Math.random(),kind,x,y,baseX:x,speed:kind.speed*rand(.65,1.33)*(1+stage*.1),scale:rand(.8,1.22),phase:rand(0,7),wiggle:rand(5,17)};
     }
     function populateFish() {
@@ -440,7 +448,8 @@
     function updateFish(dt) {
       for(let i=fish.length-1;i>=0;i--) {
         const f=fish[i]; f.y+=f.speed*dt; f.x=f.baseX+Math.sin(ambientClock*2+f.phase)*f.wiggle;
-        f.x=clamp(f.x,riverLeft(f.y)+f.kind.size*.7,riverRight(f.y)-f.kind.size*.7);
+        const left=riverLeft(f.y),right=riverRight(f.y),margin=Math.min(f.kind.size*.7,(right-left)*.39);
+        f.x=clamp(f.x,left+margin,right-margin);
         if(f.y>H+f.kind.size*2) fish[i]=createFish(false);
       }
     }
@@ -524,26 +533,79 @@
       ctx.fillStyle='#193747';ctx.beginPath();ctx.arc(-wid*.25,len*.33,Math.max(1.4,len*.034),0,7);ctx.fill();
       ctx.restore();
     }
+    // A real 3D model made from a tapered eight-sided mesh, projected with a
+    // perspective camera. Everything is generated here, so the HTML works offline.
     function drawRod(t) {
-      const base=rodBase(), tip=rodTip();
-      ctx.save();ctx.lineCap='round';
-      // Tapered, shaded rod, cork grip, metal guides and a circular reel.
-      const bend=charge?charge.power*20:hooked?Math.sin(t*13)*9:0;
-      const mx=(base.x+tip.x)/2-bend, my=(base.y+tip.y)/2;
-      ctx.strokeStyle='rgba(1,20,28,.68)';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(base.x+3,base.y+4);ctx.quadraticCurveTo(mx+5,my+4,tip.x+3,tip.y+4);ctx.stroke();
-      const shaft=ctx.createLinearGradient(base.x,base.y,tip.x,tip.y);shaft.addColorStop(0,'#eac68f');shaft.addColorStop(.26,'#795b49');shaft.addColorStop(.42,'#497d79');shaft.addColorStop(1,'#b5d9bb');
-      ctx.strokeStyle=shaft;ctx.lineWidth=11;ctx.beginPath();ctx.moveTo(base.x,base.y);ctx.quadraticCurveTo(mx,my,tip.x,tip.y);ctx.stroke();
-      ctx.strokeStyle='rgba(245,244,215,.64)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(base.x-3,base.y);ctx.quadraticCurveTo(mx-3,my,tip.x-1,tip.y);ctx.stroke();
-      ctx.fillStyle='#c99b70';ctx.strokeStyle='#253e43';ctx.lineWidth=3;
-      for(let i=0;i<4;i++){const p=i*.083;ctx.beginPath();ctx.ellipse(base.x+(tip.x-base.x)*p,base.y+(tip.y-base.y)*p,8-i*.9,4.6,Math.atan2(tip.y-base.y,tip.x-base.x),0,7);ctx.fill();ctx.stroke();}
-      for(const p of [.36,.53,.70,.86,.98]) {
-        const x=base.x+(tip.x-base.x)*p-4*Math.sin(p*Math.PI)*bend/20, y=base.y+(tip.y-base.y)*p;
-        ctx.strokeStyle='#e9d6ad';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(x,y,4.5-p*2,5-p*1.5,0,0,7);ctx.stroke();
+      const pose=rodPose(), focal=Math.max(700,W*.78);
+      const unproject=(p,z)=>({x:(p.x-W/2)*(focal+z)/focal,y:(p.y-H/2)*(focal+z)/focal,z});
+      const project=p=>{const scale=focal/(focal+p.z);return{x:W/2+p.x*scale,y:H/2+p.y*scale,scale};};
+      const near=unproject(pose.base,-205), far=unproject(pose.tip,320);
+      const dx=far.x-near.x,dy=far.y-near.y,dz=far.z-near.z;
+      const sideways=Math.hypot(dx,dy)||1;
+      const normal={x:-dy/sideways,y:dx/sideways,z:0};
+      const spine=u=>({
+        x:near.x+dx*u+normal.x*Math.sin(Math.PI*u)*(5+pose.power*22),
+        y:near.y+dy*u+normal.y*Math.sin(Math.PI*u)*(5+pose.power*22),
+        z:near.z+dz*u
+      });
+      const length=Math.hypot(dx,dy,dz);
+      const second={x:-normal.y*dz/length,y:normal.x*dz/length,z:(normal.y*dx-normal.x*dy)/length};
+      const radius=u=>u<.29?10.2-u*7.2:Math.max(1.25,7*(1-u)+.4);
+      const ring=(u,mult=1)=>{
+        const c=spine(u),r=radius(u)*mult;
+        return Array.from({length:8},(_,j)=>{
+          const a=j*Math.PI/4;
+          return {x:c.x+(normal.x*Math.cos(a)+second.x*Math.sin(a))*r,
+                  y:c.y+(normal.y*Math.cos(a)+second.y*Math.sin(a))*r,
+                  z:c.z+(normal.z*Math.cos(a)+second.z*Math.sin(a))*r};
+        });
+      };
+      const cork=['#956644','#bf925f','#e9c89a','#f6d6a1','#c69a6c','#795239','#6f4935','#a16c47'];
+      const graphite=['#174b53','#358a86','#7cc5b1','#c0e6c0','#3c9188','#164951','#0e323f','#163a46'];
+      const metal=['#775e4e','#c3945c','#f5d499','#ffe4b5','#c69865','#806354','#58494b','#a67959'];
+      const faces=[];
+      for(let i=0;i<24;i++){
+        const u=i/24,v=(i+1)/24,a=ring(u),b=ring(v);
+        for(let j=0;j<8;j++) {
+          const next=(j+1)%8;
+          let palette=u<.28?cork:graphite;
+          if(i===0||i===6||i===7||i===23)palette=metal;
+          faces.push({points:[a[j],a[next],b[next],b[j]],color:palette[j],depth:(a[j].z+a[next].z+b[next].z+b[j].z)/4});
+        }
       }
-      const rx=base.x-28,ry=base.y-52;
-      ctx.fillStyle='#31575b';ctx.strokeStyle='#d3aa70';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(rx,ry,19,12,.4,0,7);ctx.fill();ctx.stroke();
-      ctx.fillStyle='#edc18b';ctx.beginPath();ctx.arc(rx,ry,6,0,7);ctx.fill();
-      ctx.strokeStyle='#d7b886';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(rx-6,ry+11);ctx.lineTo(rx-15,ry+21);ctx.lineTo(rx-9,ry+25);ctx.stroke();
+      faces.sort((a,b)=>b.depth-a.depth);
+      ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+      for(const face of faces){
+        ctx.beginPath();face.points.forEach((p,i)=>{const v=project(p);if(i)ctx.lineTo(v.x,v.y);else ctx.moveTo(v.x,v.y);});
+        ctx.closePath();ctx.fillStyle=face.color;ctx.fill();
+      }
+      // Copper wraps and five line guides remain in proper 3D perspective.
+      for(const u of [.025,.115,.26,.305,.44,.59,.73,.86,.97]){
+        const c=spine(u),p=project(c),r=radius(u)*p.scale;
+        const isGuide=u>.32;
+        ctx.strokeStyle=isGuide?'#d8e6d8':'#e9b777';ctx.lineWidth=isGuide?1.8:2.6;
+        ctx.beginPath();ctx.ellipse(p.x,p.y,r*(isGuide?1.48:.95),r*(isGuide?1.52:.9),-.42,0,Math.PI*2);ctx.stroke();
+        if(isGuide){ctx.strokeStyle='rgba(244,245,221,.7)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(p.x-r*.18,p.y-r*.1,r*.28,0,Math.PI);ctx.stroke();}
+      }
+      // A separate projected 3D reel: barrel, side plates, six spokes and crank.
+      const mount=spine(.245);
+      const reel={x:mount.x-normal.x*31,y:mount.y-normal.y*31,z:mount.z-27};
+      const rimPoint=(a,z,r)=>project({x:reel.x+Math.cos(a)*r,y:reel.y+Math.sin(a)*r,z:reel.z+z+Math.cos(a)*3});
+      ctx.strokeStyle='#344951';ctx.lineWidth=8;ctx.beginPath();const m=project(mount),rc=project(reel);ctx.moveTo(m.x,m.y);ctx.lineTo(rc.x,rc.y);ctx.stroke();
+      for(let i=0;i<18;i++){
+        const a=i*Math.PI/9,b=(i+1)*Math.PI/9;
+        const pts=[rimPoint(a,11,21),rimPoint(b,11,21),rimPoint(b,-9,21),rimPoint(a,-9,21)];
+        ctx.fillStyle=i<9?'#897059':'#414f51';ctx.beginPath();pts.forEach((p,j)=>j?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();
+      }
+      const front=project({x:reel.x,y:reel.y,z:reel.z-10}),r=21*front.scale;
+      ctx.fillStyle='#253c45';ctx.strokeStyle='#e0b775';ctx.lineWidth=Math.max(2,r*.16);
+      ctx.beginPath();ctx.arc(front.x,front.y,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+      ctx.strokeStyle='#a9c5af';ctx.lineWidth=2;ctx.beginPath();ctx.arc(front.x,front.y,r*.72,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle='#d4aa73';ctx.lineWidth=1.9;
+      for(let i=0;i<6;i++){const a=i*Math.PI/3+(hooked?t*5:0);ctx.beginPath();ctx.moveTo(front.x+Math.cos(a)*r*.17,front.y+Math.sin(a)*r*.17);ctx.lineTo(front.x+Math.cos(a)*r*.65,front.y+Math.sin(a)*r*.65);ctx.stroke();}
+      ctx.fillStyle='#f4d39b';ctx.beginPath();ctx.arc(front.x,front.y,r*.18,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#e6c187';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(front.x,front.y);ctx.lineTo(front.x-r*.62,front.y+r*.83);ctx.lineTo(front.x-r*.36,front.y+r*1.04);ctx.stroke();
+      ctx.fillStyle='#313f42';ctx.beginPath();ctx.ellipse(front.x-r*.36,front.y+r*1.04,r*.24,r*.15,.55,0,Math.PI*2);ctx.fill();
       ctx.restore();
     }
     function drawFishing(t) {
