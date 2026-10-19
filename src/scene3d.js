@@ -23,33 +23,35 @@ shared.fin.computeVertexNormals();
 const material = (color,extra={}) => new THREE.MeshStandardMaterial({color,roughness:.68,metalness:.06,...extra});
 
 const WATER_VERT = `
- varying vec2 vUv; varying vec3 vPos;
- uniform float uTime;
+ varying vec2 vUv;
+ uniform float uTime; uniform float uForce;
  void main(){
    vUv=uv;
    vec3 p=position;
-   p.z+=sin(position.y*.43+position.x*1.7+uTime*2.5)*.095;
-   p.z+=sin(position.y*.83-position.x*2.1+uTime*4.7)*.042;
-   vPos=p;
+   float chop=sin(position.y*.59+sin(position.x*.92+uTime*.9)*1.4+uTime*3.0);
+   float swell=sin(position.y*.21-position.x*.8+uTime*1.8);
+   p.z+=(chop*.115+swell*.085)*uForce;
    gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);
  }`;
 const WATER_FRAG = `
- varying vec2 vUv; varying vec3 vPos;
- uniform float uTime; uniform vec3 uDeep; uniform vec3 uLight; uniform vec3 uFoam;
- float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+ varying vec2 vUv;
+ uniform float uTime; uniform float uForce;
+ uniform vec3 uDeep; uniform vec3 uLight; uniform vec3 uFoam;
+ uniform sampler2D uNoise;
  void main(){
-   vec2 p=vUv; float t=uTime;
-   float a=sin(p.x*35.+p.y*97.+t*12.)*.5+.5;
-   float b=sin(p.x*22.-p.y*58.-t*7.)*.5+.5;
-   float ribbons=pow(max(0.,sin(p.y*162.+sin(p.x*24.+t*2.)*4.+t*15.)),18.);
-   float thread=pow(max(0.,sin(p.y*92.+p.x*35.+t*11.)),28.);
-   float fine=pow(max(0.,sin(p.y*280.-p.x*57.+t*19.)),40.);
-   float bank=pow(1.-abs(p.x*2.-1.),8.);
-   float foam=clamp(ribbons*.44+thread*.32+fine*.19+bank*.31,0.,.87);
-   vec3 base=mix(uDeep,uLight,clamp(.27+a*.23+b*.2,0.,1.));
-   base=mix(base,uFoam,foam);
-   base+=vec3(.05,.08,.08)*sin(p.y*50.+t*4.)*.5;
-   gl_FragColor=vec4(base,1.);
+   vec2 p=vUv;
+   float swirl=texture2D(uNoise,vec2(p.x*1.15+uTime*.035,p.y*4.8-uTime*.12)).r;
+   vec2 flow=vec2(p.x*3.2+(swirl-.5)*.11,p.y*14.-uTime*.5);
+   vec4 ripple=texture2D(uNoise,flow);
+   float body=mix(.22,.86,ripple.b*.63+swirl*.37);
+   float fracture=sin(p.y*113.+swirl*9.+sin(p.x*7.+uTime*.8)*2.1-uTime*8.5);
+   float streak=smoothstep(.54,.93,fracture)*smoothstep(.43,.71,ripple.r);
+   float aerated=smoothstep(.64,.82,ripple.g*.72+swirl*.34);
+   float bank=smoothstep(.82,.98,abs(p.x*2.-1.))*(.25+.2*swirl);
+   float whitewater=clamp((streak*.54+aerated*.22+bank)*uForce,0.,.74);
+   vec3 water=mix(uDeep,uLight,body*.73+.13);
+   water=mix(water,uFoam,whitewater);
+   gl_FragColor=vec4(water,1.);
  }`;
 
 export class World3D {
@@ -58,7 +60,7 @@ export class World3D {
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
     this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure=1.66;
+    this.renderer.toneMappingExposure=1.43;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,window.innerWidth<700?1.25:1.6));
     this.renderer.shadowMap.enabled=true;
     this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -76,20 +78,23 @@ export class World3D {
     this.clock=0;
     this.makeLights();
     this.makeTerrain();
+    this.makeCliffs();
     this.makeWater();
     this.makeRapids();
     this.makeBiomes();
     this.makeCharacters();
     this.makeCastVisuals();
     this.fishMats=new Map();
+    this.fishPools=new Map(); // One set of GPU instances per species; every fish stays hookable.
+    this.fishMatrix=new THREE.Matrix4();this.fishRoot=new THREE.Object3D();this.fishPart=new THREE.Object3D();
     this.fishEyeMat=new THREE.MeshBasicMaterial({color:0x173945});
     this.fishBulbMat=new THREE.MeshBasicMaterial({color:0xffe8ab});
     this.applyStage(0);
     this.resize();
   }
   makeLights(){
-    this.ambient=new THREE.HemisphereLight(0xdffeff,0x426351,2.0);this.scene.add(this.ambient);
-    this.sun=new THREE.DirectionalLight(0xffdbb4,3.2);this.sun.position.set(-24,45,-36);
+    this.ambient=new THREE.HemisphereLight(0xdffeff,0x354d4c,1.7);this.scene.add(this.ambient);
+    this.sun=new THREE.DirectionalLight(0xffdbb4,2.9);this.sun.position.set(-24,45,-36);
     this.sun.castShadow=true;this.sun.shadow.mapSize.set(512,512);
     this.sun.shadow.camera.left=-45;this.sun.shadow.camera.right=45;
     this.sun.shadow.camera.top=45;this.sun.shadow.camera.bottom=-45;
@@ -145,16 +150,52 @@ export class World3D {
       seam.position.set(9.2,.73,-4.3+i*.92);this.scene.add(seam);
     }
   }
+  makeCliffs(){
+    // Tall, jagged river walls give the arena real depth and pressure at the horizon.
+    this.cliffMat=material(0x526a69,{roughness:1,flatShading:true});
+    this.cliffs=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),this.cliffMat,128);
+    this.cliffs.frustumCulled=false;
+    for(let i=0;i<128;i++){
+      const sign=i%2?1:-1;
+      const x=sign*(24.7+seed(i*31+8)*4.3);
+      const z=(seed(i*17+5)-.5)*214;
+      const h=2.1+seed(i*37+3)*3.7;
+      this.dummy.position.set(x,.4+h*.58,z);
+      this.dummy.rotation.set(seed(i*19)*.15,seed(i*7)*Math.PI,.18*seed(i*3));
+      this.dummy.scale.set(1.5+seed(i*29)*1.5,h,1.7+seed(i*11)*1.6);
+      this.dummy.updateMatrix();this.cliffs.setMatrixAt(i,this.dummy.matrix);
+      this.cliffs.setColorAt(i,new THREE.Color([0xa0aeb0,0x727d83,0x899696][i%4]));
+    }
+    this.scene.add(this.cliffs);
+  }
   makeWater(){
-    const uniforms={uTime:{value:0},uDeep:{value:new THREE.Color(0x10576a)},uLight:{value:new THREE.Color(STAGES[0].water)},uFoam:{value:new THREE.Color(STAGES[0].foam)}};
+    // A tiny procedural texture is generated in memory: no image download, no CDN.
+    const data=new Uint8Array(128*128*4);
+    const sample=(x,y,step,channel)=>{
+      const grid=128/step,fx=x/step,fy=y/step;
+      const ix=Math.floor(fx),iy=Math.floor(fy),u=(fx-ix)**2*(3-2*(fx-ix)),v=(fy-iy)**2*(3-2*(fy-iy));
+      const h=(a,b)=>seed(((a+grid)%grid)*47+((b+grid)%grid)*151+channel*359);
+      return (h(ix,iy)*(1-u)+h(ix+1,iy)*u)*(1-v)+(h(ix,iy+1)*(1-u)+h(ix+1,iy+1)*u)*v;
+    };
+    for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+      const i=(y*128+x)*4;
+      for(let c=0;c<3;c++)data[i+c]=Math.floor(255*(sample(x,y,32,c)*.58+sample(x,y,16,c+3)*.3+sample(x,y,8,c+6)*.12));
+      data[i+3]=255;
+    }
+    const noise=new THREE.DataTexture(data,128,128,THREE.RGBAFormat);
+    noise.wrapS=noise.wrapT=THREE.RepeatWrapping;
+    noise.minFilter=noise.magFilter=THREE.LinearFilter;noise.needsUpdate=true;
+    const uniforms={uTime:{value:0},uForce:{value:1.08},uNoise:{value:noise},
+      uDeep:{value:new THREE.Color(0x10576a)},uLight:{value:new THREE.Color(STAGES[0].water)},
+      uFoam:{value:new THREE.Color(STAGES[0].foam)}};
     const water=new THREE.Mesh(new THREE.PlaneGeometry(15.0,220,34,200),new THREE.ShaderMaterial({uniforms,vertexShader:WATER_VERT,fragmentShader:WATER_FRAG,side:THREE.DoubleSide}));
-    water.rotation.x=-Math.PI/2;water.position.y=-.12;this.scene.add(water);
+    water.rotation.x=-Math.PI/2;water.position.y=-.12;water.receiveShadow=true;this.scene.add(water);
     this.water=water;this.waterUniforms=uniforms;
     // Hundreds of independently flowing whitewater streaks, packed into ONE draw call.
     const streakGeom=new THREE.PlaneGeometry(.11,1);streakGeom.rotateX(-Math.PI/2);
-    this.streakMat=new THREE.MeshBasicMaterial({color:0xdafff4,transparent:true,opacity:.43,depthWrite:false,side:THREE.DoubleSide});
-    this.streaks=new THREE.InstancedMesh(streakGeom,this.streakMat,260);
-    this.streakData=Array.from({length:260},(_,i)=>({x:(seed(i*19+1)-.5)*13.6,z:(seed(i*13+3)-.5)*185,speed:6+seed(i*7+8)*10,length:.6+seed(i*17+12)*3.2}));
+    this.streakMat=new THREE.MeshBasicMaterial({color:0xdafff4,transparent:true,opacity:.24,depthWrite:false,side:THREE.DoubleSide});
+    this.streaks=new THREE.InstancedMesh(streakGeom,this.streakMat,330);
+    this.streakData=Array.from({length:330},(_,i)=>({x:(seed(i*19+1)-.5)*13.6,z:(seed(i*13+3)-.5)*185,speed:10+seed(i*7+8)*14,length:.45+seed(i*17+12)*1.9}));
     this.streaks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.streaks.frustumCulled=false;this.scene.add(this.streaks);
     // Smaller bright splashes are also instanced instead of separate draw calls.
     this.splashMat=new THREE.MeshBasicMaterial({color:0xe6fff0,transparent:true,opacity:.68,depthWrite:false});
@@ -163,31 +204,59 @@ export class World3D {
     this.splashes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.splashes.frustumCulled=false;this.scene.add(this.splashes);
   }
   makeRapids(){
-    this.rockMat=material(0x4c6b69,{roughness:1});
-    this.rockGroups=[];
-    const foamMat=new THREE.MeshBasicMaterial({color:0xcffff0,transparent:true,opacity:.56,depthWrite:false,side:THREE.DoubleSide});
-    for(let i=0;i<33;i++){
-      const r=.35+seed(i*5+8)*.83;
-      const x=(seed(i*7+11)-.5)*11.9,z=-90+i*5.55+(seed(i+27)-.5)*3.8;
-      const group=new THREE.Group();group.position.set(x,-.1,z);
-      const rock=new THREE.Mesh(shared.lowSphere,this.rockMat);rock.scale.set(r*1.18,r*.96,r*.91);
-      rock.position.y=.26;rock.castShadow=i%3===0;group.add(rock);
-      for(let j=0;j<3;j++){
-        const ring=new THREE.Mesh(new THREE.TorusGeometry(r*(.8+j*.34),.04,4,22),foamMat);
-        ring.rotation.x=-Math.PI/2;ring.position.set(.05,.06+j*.015,.4+j*.4);
-        ring.scale.set(1,.66,1);group.add(ring);
+    this.rockMat=material(0x526868,{roughness:1});
+    this.rockGroups=[];const foam=[];
+    for(let i=0;i<34;i++){
+      const r=.39+seed(i*5+8)*.95;
+      const x=(seed(i*7+11)-.5)*12,z=-92+i*5.53+(seed(i+27)-.5)*3.4;
+      const rock=new THREE.Mesh(shared.lowSphere,this.rockMat);
+      rock.scale.set(r*1.16,r*.87,r*.95);rock.position.set(x,.13,z);
+      rock.castShadow=i%3===0;this.scene.add(rock);
+      this.rockGroups.push({x,z,r,mesh:rock});
+      for(let j=0;j<8;j++){
+        const angle=seed(i*19+j*31)*Math.PI*2;
+        foam.push({x:x+Math.cos(angle)*(r*.9+seed(i*13+j)*.46),
+          z:z+Math.sin(angle)*r*.7+.35+seed(i+j*3)*.43,
+          sx:.11+seed(i*9+j*7)*.27,sz:.18+seed(i*5+j*11)*.37});
       }
-      this.scene.add(group);this.rockGroups.push(group);
     }
-    // Three irregular, much louder rapids across the river on the initial screen.
-    const rapids=[-13,4,17,-40,49];
-    const crestMaterial=new THREE.MeshBasicMaterial({color:0xd8fff6,transparent:true,opacity:.65,depthWrite:false,side:THREE.DoubleSide});
-    for(let n=0;n<rapids.length;n++)for(let j=0;j<18;j++){
-      const x=-7+j*.82,z=rapids[n]+Math.sin(j*.9+n)*1.22;
-      const crest=new THREE.Mesh(new THREE.TorusGeometry(.38, .055,4,11,Math.PI),crestMaterial);
-      crest.rotation.set(-Math.PI/2,0,Math.sin(j*.9)*.7);crest.position.set(x,.07,z);
-      this.scene.add(crest);
+    // Broken sheets of foam cut across rapids, rather than repeated torus / wifi icons.
+    const vertices=[],colors=[],crests=[-72,-42,-13,4,17,49,72];
+    for(let n=0;n<crests.length;n++)for(let j=0;j<18;j++){
+      if(seed(n*71+j*13)<.19)continue;
+      const x=-7+j*.83,z=crests[n]+Math.sin(j*.83+n*.9)*.62+Math.sin(j*.31+n)*.37;
+      const width=.68+seed(n*17+j*3)*.45,depth=.16+seed(n*23+j*8)*.26;
+      const p=[x,.13,z,x+width,.13,z+.13,x+width*.82,.14,z+depth+.17,
+        x,.13,z,x+width*.82,.14,z+depth+.17,x+width*.15,.13,z+depth];
+      vertices.push(...p);
+      const shade=.71+seed(n*8+j)*.25;
+      for(let v=0;v<6;v++)colors.push(shade,shade*1.08,shade*1.04);
+      foam.push({x:x+width*.3,z:z+depth*.5,sx:.18,sz:.34});
     }
+    const crestGeo=new THREE.BufferGeometry();
+    crestGeo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+    crestGeo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));crestGeo.computeVertexNormals();
+    this.crestMat=new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true,opacity:.68,depthWrite:false,toneMapped:false});
+    this.crestMesh=new THREE.Mesh(crestGeo,this.crestMat);this.crestMesh.frustumCulled=false;this.scene.add(this.crestMesh);
+    this.whiteMat=new THREE.MeshBasicMaterial({color:0xd5f8ee,transparent:true,opacity:.81,depthWrite:false,toneMapped:false});
+    this.whitePatches=new THREE.InstancedMesh(shared.lowSphere,this.whiteMat,foam.length);
+    this.whitePatches.frustumCulled=false;
+    for(let i=0;i<foam.length;i++){
+      const s=foam[i];this.dummy.position.set(s.x,.105,s.z);
+      this.dummy.rotation.set(0,seed(i*17)*Math.PI,0);
+      this.dummy.scale.set(s.sx,.015,s.sz);this.dummy.updateMatrix();
+      this.whitePatches.setMatrixAt(i,this.dummy.matrix);
+    }
+    this.scene.add(this.whitePatches);
+    this.sprayMat=new THREE.MeshBasicMaterial({color:0xe5fff1,transparent:true,opacity:.82,depthWrite:false,toneMapped:false});
+    this.spray=new THREE.InstancedMesh(shared.lowSphere,this.sprayMat,170);
+    this.spray.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.spray.frustumCulled=false;
+    this.sprayData=Array.from({length:170},(_,i)=>{
+      const r=this.rockGroups[i%this.rockGroups.length];
+      return {x:r.x+(seed(i*31)-.5)*r.r*1.2,z:r.z+(seed(i*13)-.5)*r.r,
+        phase:seed(i*47),speed:1.6+seed(i*11)*2.5,size:.035+seed(i*19)*.095};
+    });
+    this.scene.add(this.spray);
   }
   makeBiomes(){
     // Each round changes its actual 3D shoreline, not merely the water tint.
@@ -314,13 +383,20 @@ export class World3D {
   }
   applyStage(index){
     const s=STAGES[index];this.scene.background.set(s.sky);this.scene.fog.color.set(s.fog);
-    this.waterUniforms.uLight.value.set(s.water);this.waterUniforms.uDeep.value.set(s.sky);this.waterUniforms.uFoam.value.set(s.foam);
-    this.bankMat.color.set(s.bank);this.rockMat.color.set(index>=3?0x755060:0x4c6b69);
-    this.streakMat.color.set(s.foam);this.splashMat.color.set(s.foam);this.sun.color.set(s.light);
+    this.waterUniforms.uLight.value.set(s.water);
+    this.waterUniforms.uDeep.value.set(s.water).multiplyScalar(index===0?.37:.31);
+    this.waterUniforms.uFoam.value.set(s.foam);
+    this.waterUniforms.uForce.value=[1.08,1.14,1.24,1.33,1.44][index];
+    this.scene.fog.density=[.014,.017,.019,.021,.022][index];
+    this.bankMat.color.set(s.bank);this.rockMat.color.set(index>=3?0x755060:0x526868);
+    this.cliffMat.color.set([0x506368,0x555577,0x59728a,0x75515a,0x61527b][index]);
+    this.streakMat.color.set(s.foam);this.splashMat.color.set(s.foam);
+    this.sprayMat.color.set(s.foam);this.whiteMat.color.set(s.foam);this.crestMat.color.set(s.foam);
+    this.sun.color.set(s.light);
     this.leafMat.color.set([0x3d866c,0x745c91,0x75a6b5,0x733e57,0x546094][index]);
     this.trunkMat.color.set([0x715646,0x59405c,0x556c85,0x4a313d,0x383e68][index]);
     this.biomes.forEach((mesh,i)=>{mesh.visible=i===index;});this.runeRings.visible=index===4;
-    this.sun.intensity=index>=3?2.2:3.2;this.ambient.intensity=index===4?1.35:2.0;
+    this.sun.intensity=index>=3?2.1:2.9;this.ambient.intensity=index===4?1.35:1.7;
   }
   resize(){
     const w=Math.max(320,this.canvas.clientWidth),h=Math.max(430,this.canvas.clientHeight),aspect=w/h;
@@ -420,6 +496,16 @@ export class World3D {
       this.place(this.splashes,i,s.x,.15+Math.abs(Math.sin(t*5+s.phase))*.23,s.z,s.size,s.size*.5,s.size);
     }
     this.splashes.instanceMatrix.needsUpdate=true;
+    for(let i=0;i<this.sprayData.length;i++){
+      const s=this.sprayData[i],p=(t*s.speed+s.phase)%1;
+      const x=s.x+Math.sin(p*4+s.phase*8)*.21;
+      const z=s.z+p*(.6+s.size*6);
+      const y=.13+Math.sin(Math.PI*p)*(.48+s.size*7);
+      const scale=s.size*(1-p*.5);
+      this.place(this.spray,i,x,y,z,scale,scale*.78,scale);
+    }
+    this.spray.instanceMatrix.needsUpdate=true;
+    this.crestMat.opacity=.66+Math.sin(t*4)*.065;
   }
   updateCamera(playerX,playerZ,dt){
     const target=V(playerX*.36,0,playerZ-5);
@@ -451,20 +537,79 @@ export class World3D {
     if(fish){this.pullRing.position.set(fish.x,.11,fish.z);
       this.pullRing.scale.setScalar(1+Math.sin(t*7)*.13);}
   }
-  makeFish(kind){
-    const g=new THREE.Group(),r=kind.radius;
-    if(!this.fishMats.has(kind.id))this.fishMats.set(kind.id,{
-      body:material(kind.color,{metalness:kind.tier>=3?.28:.11,roughness:.48}),
-      under:material(new THREE.Color(kind.color).multiplyScalar(.63),{roughness:.69}),
-      fin:new THREE.MeshStandardMaterial({color:kind.color,roughness:.59,side:THREE.DoubleSide})
-    });
-    const {body:bodyMat,under:underMat,fin:finMat}=this.fishMats.get(kind.id);
-    let sx=.42*r,sy=.31*r,sz=1.11*r;
+  fishDimensions(kind){
+    const r=kind.radius;let sx=.42*r,sy=.31*r,sz=1.11*r;
     if(kind.shape==='eel'){sx=.24*r;sy=.20*r;sz=1.48*r;}
     if(kind.shape==='giant'){sx=.57*r;sy=.37*r;sz=1.18*r;}
     if(kind.shape==='ray'){sx=.86*r;sy=.12*r;sz=.68*r;}
     if(kind.shape==='disc'||kind.shape==='puffer'){sx=.65*r;sy=.27*r;sz=.70*r;}
     if(kind.shape==='needle'){sx=.18*r;sy=.19*r;sz=1.44*r;}
+    return {r,sx,sy,sz};
+  }
+  fishMaterial(kind){
+    if(!this.fishMats.has(kind.id))this.fishMats.set(kind.id,{
+      body:material(new THREE.Color(kind.color).multiplyScalar(.87),{metalness:kind.tier>=3?.27:.09,roughness:.41}),
+      under:material(new THREE.Color(kind.color).multiplyScalar(.49),{roughness:.76}),
+      fin:new THREE.MeshStandardMaterial({color:new THREE.Color(kind.color).multiplyScalar(.78),roughness:.48,side:THREE.DoubleSide})
+    });
+    return this.fishMats.get(kind.id);
+  }
+  fishPool(kind,mats){
+    if(this.fishPools.has(kind.id))return this.fishPools.get(kind.id);
+    const max=240;
+    const make=(geometry,mat,n=max)=>{
+      const mesh=new THREE.InstancedMesh(geometry,mat,n);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.count=0;mesh.visible=false;mesh.frustumCulled=false;this.scene.add(mesh);
+      return mesh;
+    };
+    const pool={used:0,dimensions:this.fishDimensions(kind),
+      body:make(shared.sphere,mats.body),tail:make(shared.fin,mats.fin),
+      dorsal:make(shared.cone,mats.under),eyes:make(shared.sphere,this.fishEyeMat,max*2),
+      wings:kind.shape==='ray'?make(shared.fin,mats.fin,max*2):null};
+    this.fishPools.set(kind.id,pool);return pool;
+  }
+  fishInstance(mesh,index,root,x,y,z,sx,sy,sz,ry=0,rz=0){
+    const part=this.fishPart;
+    part.position.set(x,y,z);part.rotation.set(0,ry,rz);part.scale.set(sx,sy,sz);part.updateMatrix();
+    this.fishMatrix.multiplyMatrices(root,part.matrix);mesh.setMatrixAt(index,this.fishMatrix);
+  }
+  flushFish(fishes){
+    for(const pool of this.fishPools.values())pool.used=0;
+    for(const fish of fishes){
+      const proxy=fish.mesh;if(!proxy?.isInstancedFish)continue;
+      const pool=this.fishPools.get(fish.kind.id);
+      if(pool.used>=240)continue;
+      const i=pool.used++,{sx,sy,sz,r}=pool.dimensions;
+      const root=this.fishRoot;
+      root.position.copy(proxy.position);root.rotation.copy(proxy.rotation);root.scale.copy(proxy.scale);root.updateMatrix();
+      const matrix=root.matrix;
+      this.fishInstance(pool.body,i,matrix,0,0,0,sx,proxy.userData.body.scale.y||sy,sz);
+      this.fishInstance(pool.tail,i,matrix,0,.07,-sz*.85,r*.99,1,r*.75,proxy.userData.tail.rotation.y);
+      this.fishInstance(pool.dorsal,i,matrix,0,sy*.92,-.13*r,.27*r,.61*r,.27*r,0,.16);
+      const eyeSize=Math.max(.038,.08*r);
+      for(let side=0;side<2;side++)this.fishInstance(pool.eyes,i*2+side,matrix,(side?1:-1)*sx*.88,sy*.42,sz*.73,eyeSize,eyeSize,eyeSize);
+      if(pool.wings)for(let side=0;side<2;side++)this.fishInstance(pool.wings,i*2+side,matrix,(side?1:-1)*.43*r,0,-.08*r,r*1.24,1,r*.65,(side?1:-1)*1.2);
+    }
+    for(const pool of this.fishPools.values()){
+      const active=pool.used>0;
+      for(const mesh of [pool.body,pool.tail,pool.dorsal,pool.eyes,pool.wings]){
+        if(!mesh)continue;
+        mesh.count=pool.used*(mesh===pool.eyes||mesh===pool.wings?2:1);
+        mesh.visible=active;
+        if(active)mesh.instanceMatrix.needsUpdate=true;
+      }
+    }
+  }
+  makeFish(kind){
+    const {r,sx,sy,sz}=this.fishDimensions(kind);
+    const {body:bodyMat,under:underMat,fin:finMat}=this.fishMaterial(kind);
+    if(kind.id!=='leviathan'){
+      this.fishPool(kind,{body:bodyMat,under:underMat,fin:finMat});
+      return {isInstancedFish:true,position:V(0,0,0),rotation:new THREE.Euler(),
+        scale:V(1,1,1),userData:{tail:{rotation:{y:0}},body:{scale:{y:sy}},bodyBaseY:sy}};
+    }
+    const g=new THREE.Group();
     const body=new THREE.Mesh(shared.sphere,bodyMat);body.scale.set(sx,sy,sz);body.castShadow=false;g.add(body);
     const belly=new THREE.Mesh(shared.sphere,underMat);belly.scale.set(sx*.93,sy*.60,sz*.9);belly.position.y=-sy*.5;g.add(belly);
     const tail=new THREE.Group();tail.position.z=-sz*.85;g.add(tail);
@@ -508,8 +653,8 @@ export class World3D {
     if(kind.id==='leviathan'){
       const shine=new THREE.PointLight(kind.color,.65,4,2);shine.position.set(0,.46,0);g.add(shine);
     }
-    g.userData={tail,body,kind};this.scene.add(g);return g;
+    g.userData={tail,body,kind,bodyBaseY:sy};this.scene.add(g);return g;
   }
-  removeFish(mesh){this.scene.remove(mesh);}
+  removeFish(mesh){if(mesh&&!mesh.isInstancedFish)this.scene.remove(mesh);}
   render(){this.renderer.render(this.scene,this.camera);}
 }

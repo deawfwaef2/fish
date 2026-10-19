@@ -136,7 +136,7 @@ class Game {
     this.bots=this.makeBots();this.world.setBots(this.bots);
     this.me={id:0,name:this.save.name,title:this.title(),score:0,me:true,alive:true};
     this.alive=[this.me,...this.bots];this.botChatTimer=rand(5,9);this.hudTimer=0;this.labelTimer=0;
-    this.clearFish();for(let i=0;i<this.fishCapacity();i++)this.fish.push(this.newFish(true));
+    this.clearFish();for(let i=0;i<this.fishCapacity(true);i++)this.fish.push(this.newFish(true));
     this.world.applyStage(0);document.body.dataset.ui=String(this.active.ui);
     $('identity').textContent=`${this.save.name} · ${this.title()} · ID ${this.save.pid} · 本地模拟赛`;
     $('chat-lines').replaceChildren();this.postChat('系统','本轮 100 人，60 秒后淘汰后 50 人。这里全部是本地模拟对手。');
@@ -146,7 +146,11 @@ class Game {
     this.updateHUD();this.stageBanner('100 人入场 · 每 60 秒淘汰后半区');
   }
   clearFish(){for(const f of this.fish)this.world.removeFish(f.mesh);this.fish=[];}
-  fishCapacity(){return this.world.canvas.clientWidth<700?58:76;}
+  fishCapacity(playing=this.mode==='playing'){
+    const mobile=this.world.canvas.clientWidth<700;
+    if(!playing)return mobile?75:105;
+    return mobile?(this.stage>=3?112:140):(this.stage>=3?172:210);
+  }
   fishWeight(k){
     if(k.tier>Math.min(4,this.stage+1))return 0;
     if(k.tier>this.stage)return k.weight*.025;
@@ -161,11 +165,17 @@ class Game {
     for(const k of pool){roll-=this.fishWeight(k);if(roll<=0)return k;}return pool[0];
   }
   newFish(initial=false){
-    const kind=this.pickFish();const scale=rand(.82,1.18),x=rand(-6.5,6.5);
-    const z=initial?clamp(this.player.z+rand(-47,47),-102,102):clamp(this.player.z-rand(32,47),-102,102);
-    const mesh=this.world.makeFish(kind);
-    const f={id:Math.random(),kind,mesh,x,z,baseX:x,phase:rand(0,7),size:scale,speed:kind.speed*rand(.72,1.3)*(1+this.stage*.07),hooked:false};
-    mesh.scale.setScalar(scale);mesh.position.set(x,.15,z);return f;
+    const kind=this.pickFish(),scale=rand(.85,1.24);
+    // Lanes and pockets read as living shoals instead of identical scattered icons.
+    const lanes=[-5.75,-4.15,-2.15,-.15,1.9,3.95,5.65];
+    const x=Math.random()<.83?clamp(choice(lanes)+rand(-1.1,1.1),-6.6,6.6):rand(-6.5,6.5);
+    const schools=[-40,-27,-11,4,19,36];
+    const rawZ=initial?this.player.z+(Math.random()<.77?choice(schools)+rand(-8.5,8.5):rand(-47,47)):
+      this.player.z-rand(34,48);
+    const z=clamp(rawZ,-102,102),mesh=this.world.makeFish(kind);
+    const f={id:Math.random(),kind,mesh,x,z,baseX:x,phase:rand(0,7),size:scale,
+      speed:kind.speed*rand(.7,1.35)*(1+this.stage*.08),hooked:false};
+    mesh.scale.setScalar(scale);mesh.position.set(x,.015,z);return f;
   }
   sortPlayers(){return [...this.alive].sort((a,b)=>b.score-a.score||(a.me?-1:b.me?1:a.id-b.id));}
   updateHUD(){
@@ -395,15 +405,16 @@ class Game {
       const f=this.fish[i];
       if(!f.hooked){
         f.z+=dt*f.speed;
-        f.x=clamp(f.baseX+Math.sin(this.clock*1.7+f.phase)*.25,-6.75,6.75);
+        f.x=clamp(f.baseX+Math.sin(this.clock*1.45+f.phase)*.27+Math.sin(this.clock*.38+f.phase*2)*.13,-6.65,6.65);
         if(f.z>Math.min(104,this.player.z+47)){
           this.world.removeFish(f.mesh);this.fish[i]=this.newFish(false);continue;
         }
       }
-      f.mesh.position.set(f.x,.19+Math.sin(this.clock*4+f.phase)*.07,f.z);
-      f.mesh.rotation.y=Math.sin(this.clock*2+f.phase)*.12;
-      f.mesh.userData.tail.rotation.y=Math.sin(this.clock*10+f.phase)*.32;
-      f.mesh.userData.body.scale.y=(f.kind.shape==='ray'?.13:.31)*f.kind.radius*(1+Math.sin(this.clock*7+f.phase)*.04);
+      const caught=this.hooked?.fish===f;
+      f.mesh.position.set(f.x,(caught ? .22+(this.hooked?.progress||0)*.0012 : -.045)+Math.sin(this.clock*3.6+f.phase)*.032,f.z);
+      f.mesh.rotation.y=Math.sin(this.clock*2+f.phase)*.15;
+      f.mesh.userData.tail.rotation.y=Math.sin(this.clock*10+f.phase)*.42;
+      f.mesh.userData.body.scale.y=f.mesh.userData.bodyBaseY*(1+Math.sin(this.clock*7+f.phase)*.055);
     }
   }
   movePlayer(dt){
@@ -522,6 +533,7 @@ class Game {
     this.world.showLine(this.mode==='playing'?(hook?new THREE.Vector3(hook.x,.2,hook.z):this.cast?.pos):null,this.clock);
     this.world.showPull(hook,this.clock);
     if(this.mode==='playing'&&this.labelTimer<=0){this.labelTimer=.16;this.updateLabels();}
+    this.world.flushFish(this.fish);
     this.world.render();
     this.frame=requestAnimationFrame(t=>this.update(t));
   }
