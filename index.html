@@ -123,6 +123,7 @@
     .inventory { margin:12px 0 18px; color:#d6e5db; font-size:11px; line-height:1.9; }
     .toast { position:absolute; z-index:11; left:50%; top:20%; transform:translate(-50%,-10px); padding:11px 18px; max-width:90%; border:1px solid rgba(241,221,177,.4); border-radius:10px; background:rgba(13,38,42,.9); color:#ffe0a1; font-size:13px; font-weight:700; pointer-events:none; opacity:0; transition:opacity .22s,transform .22s; white-space:nowrap; }
     .toast.show { opacity:1; transform:translate(-50%,0); }
+    #full-board:not(.hidden) ~ .toast { opacity:0!important; }
     #stage-splash { position:absolute; z-index:5; left:50%; top:47%; display:flex; flex-direction:column; align-items:center; gap:8px; width:min(560px,90vw); padding:20px; transform:translate(-50%,-50%); opacity:0; pointer-events:none; text-align:center; text-shadow:0 4px 30px #001c2a; }
     #stage-splash::before { content:''; position:absolute; z-index:-1; inset:-25px -35px; border-radius:80px; background:radial-gradient(ellipse,rgba(4,29,40,.83),rgba(4,29,40,0) 70%); }
     #stage-splash span { color:var(--accent); font-size:11px; font-weight:850; letter-spacing:.48em; }
@@ -300,10 +301,18 @@
     function speciesWeight(s) {
       const lure=s.tier>0&&s.tier>=stage?1+(activeGear.rareBoost||0)*2:1;
       if(s.tier>stage)return s.weight*.035*lure; // A glimpse of tomorrow's fish.
-      return s.weight*(s.tier===stage?1+stage*.8:Math.max(.13,1-(stage-s.tier)*.32))*lure;
+      let weight=s.weight*(s.tier===stage?1+stage*.8:Math.max(.13,1-(stage-s.tier)*.32))*lure;
+      if(stage===ROUNDS&&s.id==='leviathan')weight*=.13;
+      if(stage===ROUNDS&&s.id==='dragon')weight*=.22;
+      return weight;
     }
     function pickSpecies() {
-      const pool=species.filter(s=>s.tier<=Math.min(stage+1,4));
+      const pool=species.filter(s=>{
+        if(s.tier>Math.min(stage+1,4))return false;
+        if(s.id==='leviathan'&&fish.filter(f=>f.kind.id===s.id).length>=(W<650?1:3))return false;
+        if(s.id==='dragon'&&fish.filter(f=>f.kind.id===s.id).length>=(W<650?4:7))return false;
+        return true;
+      });
       const total=pool.reduce((n,s)=>n+speciesWeight(s),0);
       let roll=Math.random()*total;
       for(const item of pool){roll-=speciesWeight(item);if(roll<=0)return item;}
@@ -318,8 +327,9 @@
       return {id:Math.random(),kind,x,y,baseX:x,speed:kind.speed*rand(.65,1.33)*(1+stage*.1),scale:rand(.8,1.22),phase:rand(0,7),wiggle:rand(5,17)};
     }
     function populateFish() {
-      const target = W < 650 ? 55 : 95;
-      fish = Array.from({length:target},() => createFish(true));
+      const target=stage>=4?(W<650?42:70):stage>=3?(W<650?48:82):(W<650?55:95);
+      fish=[];
+      for(let i=0;i<target;i++)fish.push(createFish(true));
     }
     function notify(message) {
       const el=$('toast'); el.textContent=message; el.classList.add('show');
@@ -570,7 +580,9 @@
     }
     function hookFish(f) {
       const i=fish.indexOf(f); if (i<0) return;
-      fish.splice(i,1); hooked={fish:f,progress:0,tension:.12,taps:0,age:0};
+      fish.splice(i,1);
+      hooked={fish:f,progress:0,tension:.12,taps:0,age:0,startX:f.x,startY:f.y,
+        shoreX:riverRight(H*.76)-Math.min(36,f.kind.size*.48),shoreY:H*.77};
       cast=null; $('fight').classList.remove('hidden'); $('fight-name').textContent=`${f.kind.name} 咬钩了！`; 
       $('fight-hint').textContent=activeGear.power<f.kind.need?`拉力不足（需 ${f.kind.need}，当前 ${activeGear.power}）· 按 R 放生`:'快速连按空格收线 · 注意下方脱钩危险 · R 放生';
       setStatus(activeGear.power<f.kind.need?'鱼太大！当前鱼竿<strong>拉不动</strong>，按 R 放生':'咬钩！疯狂按 <strong>空格</strong> 收线 · R 放生');
@@ -597,7 +609,13 @@
         hooked.age+=dt;
         hooked.tension+=dt*(.056+hooked.fish.kind.need*.009)*(1-(activeGear.steady||0));
         hooked.progress=Math.max(0,hooked.progress-dt*(1+hooked.fish.kind.need*.38));
-        hooked.fish.y+=dt*25;
+        hooked.startY+=dt*7; // Without reeling, the current slowly carries the fish away.
+        const pull=Math.pow(clamp(hooked.progress/100,0,1),.85);
+        const goalX=hooked.startX+(hooked.shoreX-hooked.startX)*pull;
+        const goalY=hooked.startY+(hooked.shoreY-hooked.startY)*pull;
+        const smoothing=Math.min(1,dt*10);
+        hooked.fish.x+=(goalX-hooked.fish.x)*smoothing;
+        hooked.fish.y+=(goalY-hooked.fish.y)*smoothing;
         $('progress-fill').style.width=`${clamp(hooked.progress,0,100)}%`;
         $('tension-fill').style.width=`${clamp(hooked.tension*100,0,100)}%`;
         if(hooked.tension>=1||hooked.age>32) {releaseFish('脱钩了！更快连按空格，或主动按 R 放生');notify('鱼挣脱了！');}
@@ -916,9 +934,15 @@
       ctx.strokeStyle='rgba(166,250,222,.78)';ctx.beginPath();ctx.arc(chosen.x,nextY,11+Math.sin(t*4)*2,0,Math.PI*2);ctx.stroke();
       ctx.fillStyle='#d0ffe7';ctx.font='700 10px system-ui';ctx.fillText(`提前 ${Math.round(chosen.speed*.55)} px`,chosen.x+16,nextY-7);
       if(activeGear.ui>=4){
-        for(const f of fish){if(f.kind.value<70||f.y<20||f.y>H-20)continue;
-          ctx.fillStyle=f.kind.tier>=3?'#ffe0ae':'#bcf7e7';ctx.font='700 10px system-ui';
-          ctx.fillText(`${f.kind.name} · ${f.kind.value}G`,f.x+f.kind.size*.45,f.y-4);
+        const labels=fish.filter(f=>f.kind.value>=105&&f.y>35&&f.y<H-35)
+          .sort((a,b)=>Math.hypot(a.x-focus.x,a.y-focus.y)-Math.hypot(b.x-focus.x,b.y-focus.y)).slice(0,7);
+        const occupied=[];
+        for(const f of labels){
+          const x=f.x+f.kind.size*.45,y=f.y-4;
+          if(occupied.some(p=>Math.abs(p.x-x)<105&&Math.abs(p.y-y)<24))continue;
+          occupied.push({x,y});ctx.font='700 10px system-ui';ctx.lineWidth=3;
+          ctx.strokeStyle='rgba(7,26,39,.85)';ctx.strokeText(`${f.kind.name} · ${f.kind.value}G`,x,y);
+          ctx.fillStyle=f.kind.tier>=3?'#ffe0ae':'#bcf7e7';ctx.fillText(`${f.kind.name} · ${f.kind.value}G`,x,y);
         }
       }
       ctx.restore();
