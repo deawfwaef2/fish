@@ -36,6 +36,26 @@
     #stage-label { position:absolute; left:50%; top:88px; transform:translateX(-50%); padding:6px 18px; border:1px solid rgba(233,246,241,.18); border-radius:20px; background:rgba(8,29,37,.49); color:#e8f4ec; font-size:11px; letter-spacing:.32em; white-space:nowrap; text-shadow:0 2px 9px #122; }
     #board { position:absolute; top:108px; right:25px; width:218px; padding:14px; border:1px solid var(--border); border-radius:14px; background:var(--panel); backdrop-filter:blur(16px); box-shadow:0 20px 45px #001a2470; opacity:0; transform:translateX(12px); transition:opacity .25s,transform .25s; }
     #board.visible { opacity:1; transform:translateX(0); }
+    .board-toggle { position:absolute; top:76px; right:27px; padding:7px 10px; border:1px solid rgba(218,249,230,.21); border-radius:8px; background:rgba(8,29,37,.65); color:#d0eee3; font-size:10px; font-weight:800; letter-spacing:.04em; pointer-events:auto; }
+    .board-toggle:hover { border-color:var(--accent); }
+    #full-board { position:absolute; inset:0; z-index:8; display:grid; place-items:center; padding:16px; background:rgba(2,17,25,.79); backdrop-filter:blur(9px); }
+    .full-card { width:min(640px,100%); max-height:min(710px,88vh); display:flex; flex-direction:column; padding:23px; border:1px solid rgba(171,226,207,.36); border-radius:16px; background:#0c2731; box-shadow:0 25px 90px #0009; }
+    .full-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .full-head h2 { margin:5px 0; font-family:Georgia,"Noto Serif SC",serif; font-size:29px; font-weight:450; }
+    .full-head button { padding:8px 12px; border:1px solid rgba(198,236,218,.3); border-radius:7px; background:#1b4049; color:#eff9ed; }
+    #full-info { margin:10px 0 12px; color:#bbd2cb; font-size:11px; line-height:1.6; }
+    #full-list { min-height:0; overflow:auto; scrollbar-color:#6daca0 #132f37; }
+    .full-row { display:flex; align-items:center; gap:13px; padding:7px 10px; min-height:45px; border-bottom:1px solid rgba(218,245,222,.08); font-size:12px; }
+    .full-row:last-child { border:0; }
+    .full-row.safe-line { border-bottom:2px solid rgba(240,199,129,.62); }
+    .full-row.me { border-radius:7px; background:rgba(239,205,138,.12); color:#ffe2ad; }
+    .full-rank { width:27px; color:var(--accent); font-weight:850; font-variant-numeric:tabular-nums; }
+    .full-avatar { display:grid; place-items:center; width:26px; height:26px; border-radius:7px; background:#315a62; color:#e0f6e6; font-size:13px; }
+    .full-player { display:flex; flex:1; flex-direction:column; min-width:0; }
+    .full-player strong,.full-player small { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .full-player strong { font-size:12px; }
+    .full-player small { margin-top:2px; color:#96b2ae; font-size:10px; }
+    .full-score { color:#f1dbac; font-weight:800; font-variant-numeric:tabular-nums; }
     .panel-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#aac9c8; font-size:10px; font-weight:800; letter-spacing:.18em; }
     .board-row { display:flex; align-items:center; gap:7px; padding:7px 4px; border-bottom:1px solid rgba(255,255,255,.07); font-size:11px; }
     .board-row:last-child { border:0; }
@@ -103,17 +123,25 @@
     .inventory { margin:12px 0 18px; color:#d6e5db; font-size:11px; line-height:1.9; }
     .toast { position:absolute; z-index:11; left:50%; top:20%; transform:translate(-50%,-10px); padding:11px 18px; max-width:90%; border:1px solid rgba(241,221,177,.4); border-radius:10px; background:rgba(13,38,42,.9); color:#ffe0a1; font-size:13px; font-weight:700; pointer-events:none; opacity:0; transition:opacity .22s,transform .22s; white-space:nowrap; }
     .toast.show { opacity:1; transform:translate(-50%,0); }
+    #stage-splash { position:absolute; z-index:5; left:50%; top:47%; display:flex; flex-direction:column; align-items:center; gap:8px; width:min(560px,90vw); padding:20px; transform:translate(-50%,-50%); opacity:0; pointer-events:none; text-align:center; text-shadow:0 4px 30px #001c2a; }
+    #stage-splash::before { content:''; position:absolute; z-index:-1; inset:-25px -35px; border-radius:80px; background:radial-gradient(ellipse,rgba(4,29,40,.83),rgba(4,29,40,0) 70%); }
+    #stage-splash span { color:var(--accent); font-size:11px; font-weight:850; letter-spacing:.48em; }
+    #stage-splash strong { color:#fff8e7; font-family:Georgia,"Noto Serif SC",serif; font-size:clamp(33px,6vw,66px); font-weight:500; letter-spacing:.08em; }
+    #stage-splash small { color:#e0f1e7; font-size:12px; letter-spacing:.12em; }
+    #stage-splash.show { animation:stage-reveal 2.25s ease-in-out both; }
+    @keyframes stage-reveal { 0% { opacity:0; filter:blur(8px); transform:translate(-50%,-40%) scale(.86); } 17%,70% { opacity:1; filter:blur(0); transform:translate(-50%,-50%) scale(1); } 100% { opacity:0; transform:translate(-50%,-58%) scale(1.05); } }
     @media (pointer:coarse) { #touch-controls { display:flex; } }
     @media (max-width:700px) {
       .topbar { top:12px; left:12px; right:12px; }
-      .mark-icon { display:none; }
-      .mark strong { font-size:13px; }
-      .mark small { font-size:7px; }
+      .mark { display:none; }
+      .topbar { justify-content:flex-end; }
       .pill { padding:8px 7px; min-height:35px; font-size:9px; }
       .pill em { font-size:13px; }
       .meta { gap:4px; }
       #stage-label { top:65px; font-size:9px; }
-      #board { right:10px; top:104px; width:190px; }
+      .board-toggle { top:98px; right:11px; }
+      #board { right:10px; top:134px; width:190px; }
+      .full-card { max-height:85vh; padding:15px; }
       #feed { bottom:140px; left:10px; width:min(260px,67vw); }
       #status { bottom:16px; padding:9px 12px; font-size:10px; }
       #fight { bottom:102px; }
@@ -134,14 +162,19 @@
         <div class="meta"><div class="pill" id="clock">倒计时 <em>60</em></div><div class="pill">金币 <em id="gold">0</em></div><div class="pill">排名 <em id="rank">--</em></div></div>
       </div>
       <div id="stage-label">第 1 阶段 · 初潮浅滩 · 100 位选手</div>
+      <button id="board-open" class="board-toggle" type="button" aria-label="查看完整排行榜">完整排行 · L</button>
       <div id="board"><div class="panel-title"><span>实时排名</span><span>TOP 5</span></div><div id="board-rows"></div><div class="footnote" style="margin-top:8px">本地模拟对手 · 按 Tab 显示 / 隐藏</div></div>
       <div id="feed"><div class="panel-title">河岸频道 · 按 Enter 发言</div><div id="feed-lines"></div></div>
       <div id="chat-box" class="hidden"><input id="chat-input" maxlength="60" placeholder="说点什么…（仅本地显示）" autocomplete="off"><button id="chat-send">发送</button></div>
       <div id="sonar" class="hidden"></div>
       <div id="fight" class="hidden"><div id="fight-name"></div><div id="fight-hint">快速按空格收线 · R 放生</div><div class="meter"><div id="progress-fill"></div></div><div class="meter danger"><div id="tension-fill"></div></div></div>
       <div id="status">按住鼠标左键 <strong>蓄力</strong>，松开抛竿 · 空格收线 · Tab 排行</div>
-      <div id="touch-controls"><button id="touch-reel">连点收线</button><button id="touch-release">放生</button></div>
+      <div id="touch-controls"><button id="touch-reel">连点收线</button><button id="touch-release">放生</button><button id="touch-chat">聊天</button></div>
     </div>
+    <section id="full-board" class="hidden" role="dialog" aria-modal="true" aria-label="完整实时排行榜">
+      <div class="full-card"><div class="full-head"><div><div class="eyebrow">LIVE STANDINGS · 离线模拟</div><h2>完整排行榜</h2></div><button id="board-close" type="button">关闭 ×</button></div><div id="full-info"></div><div id="full-list"></div></div>
+    </section>
+    <div id="stage-splash" aria-live="polite"><span id="splash-round"></span><strong id="splash-name"></strong><small id="splash-sub"></small></div>
     <div id="screen"><div class="screen-inner" id="screen-content"></div></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
@@ -292,6 +325,13 @@
       const el=$('toast'); el.textContent=message; el.classList.add('show');
       clearTimeout(toastTimeout); toastTimeout=setTimeout(()=>el.classList.remove('show'),2100);
     }
+    function showStageSplash(subtitle) {
+      const el=$('stage-splash');
+      $('splash-round').textContent=stage===ROUNDS?'F I N A L  R O U N D':`S T A G E  ${String(stage+1).padStart(2,'0')}`;
+      $('splash-name').textContent=stages[stage].name;
+      $('splash-sub').textContent=subtitle;
+      el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
+    }
     function setStatus(html) { $('status').innerHTML=html; }
 
     function renderMenu() {
@@ -347,18 +387,31 @@
       bots=makeBots(); alive=[{id:0,name:save.name,title:playerTitle(),pid:save.pid,score:0,me:true},...bots];
       haul={}; cast=null; hooked=null; charge=null; forceBoard=false; botTick=0; hudTick=0; chatTick=rand(5,9); pendingReplies=[];
       $('profile-label').textContent=`${save.name} · ${playerTitle()} · ID ${save.pid} · 离线模拟赛`;
-      $('hud').classList.remove('hidden'); screen.classList.add('hidden'); $('fight').classList.add('hidden'); $('chat-box').classList.add('hidden');
+      $('hud').classList.remove('hidden'); screen.classList.add('hidden'); $('full-board').classList.add('hidden'); $('fight').classList.add('hidden'); $('chat-box').classList.add('hidden');
       $('gear-frame').className=activeGear.ui>=4?'tier-4':activeGear.ui>=3?'tier-3':activeGear.ui>=2?'tier-2':'';
       $('feed').classList.toggle('visible',activeGear.ui>=2);
       $('sonar').classList.toggle('hidden',activeGear.ui<2);
       $('board').classList.toggle('visible',activeGear.ui>=1);
       $('feed-lines').replaceChildren();
       document.documentElement.style.setProperty('--accent',stages[0].accent);
-      populateFish(); updateHUD();
+      populateFish(); updateHUD(); showStageSplash('百人入河 · 60 秒后淘汰一半');
       setStatus('指向水面按住左键 <strong>蓄力</strong>，松开抛竿 · 空格收线');
       notify(`第 1 阶段：${stages[0].name} · 100 人开赛！`);
     }
     function sortPlayers() { return [...alive].sort((a,b)=>b.score-a.score); }
+    function renderFullBoard(sorted=sortPlayers()) {
+      const advancing=stage===ROUNDS?1:Math.ceil(sorted.length/2);
+      $('full-info').textContent=`${stages[stage].name} · 剩余 ${Math.ceil(timeLeft)} 秒 · 参赛 ${alive.length} 人 · ${stage===ROUNDS?'冠军仅 1 名':`晋级 ${advancing} 人`} · 分数线 ${fmt(cutoffScore)} 金币`;
+      const list=$('full-list'),scroll=list.scrollTop;
+      const caught=Object.values(haul).reduce((n,v)=>n+v,0);
+      list.innerHTML=sorted.map((p,i)=>`<div class="full-row ${p.me?'me':''} ${i+1===advancing?'safe-line':''}"><span class="full-rank">${i+1}</span><span class="full-avatar" style="background:hsl(${(p.id*47+174)%360} 31% 29%)">${p.me?'♛':['◇','✦','⌁','◈','♧'][p.id%5]}</span><span class="full-player"><strong>${esc(p.name)}${p.me?' · 你':''}</strong><small>${esc(p.title)} · ${p.me?`ID ${esc(save.pid)} · ${caught} 条鱼`:`${p.catches} 条鱼 · ${p.misses} 次脱钩`}</small></span><span class="full-score">${fmt(p.score)} G</span></div>`).join('');
+      list.scrollTop=scroll;
+    }
+    function toggleFullBoard(open) {
+      if(mode!=='playing')return;
+      $('full-board').classList.toggle('hidden',!open);
+      if(open)renderFullBoard();
+    }
     function updateHUD() {
       if (mode!=='playing') return;
       const sorted=sortPlayers(); rank=sorted.findIndex(p=>p.me)+1;
@@ -376,6 +429,7 @@
         $('sonar').textContent=near?`◉ 探鱼仪 · ${near.kind.name} / ${Math.round(near.speed)} 流速\n瞄准鱼前方约 ${Math.round(near.speed*.5)} 像素`:'◉ 探鱼仪 · 正在扫描鱼群';
         $('sonar').style.whiteSpace='pre-line';
       }
+      if(!$('full-board').classList.contains('hidden'))renderFullBoard(sorted);
     }
     function postChat(name,text) {
       const line=document.createElement('div'); line.className='feed-line';
@@ -434,7 +488,7 @@
       if (placement>keep) { finish(false,false); return; }
       alive=sorted.slice(0,keep); stage++; timeLeft=ROUND_TIME; cast=null; hooked=null; charge=null;
       $('fight').classList.add('hidden'); document.documentElement.style.setProperty('--accent',stages[stage].accent);
-      populateFish(); updateHUD();
+      populateFish(); updateHUD();showStageSplash(stage===ROUNDS?`剩余 ${alive.length} 人 · 冠军获得神秘宝箱`:`晋级 ${alive.length} 人 · 全新鱼群已抵达`);
       const message=stage===ROUNDS?`存活 ${alive.length} 人！最终决战：争夺冠军宝箱`:`成功晋级！剩余 ${alive.length} 人 · 场景切换：${stages[stage].name}`;
       notify(message); postChat('系统',message);
       setStatus(stage===ROUNDS?'最终决战！尽可能钓取高分鱼，只有第一名获胜':'新鱼群抵达！指向水面蓄力抛竿 · 空格收线');
@@ -446,7 +500,7 @@
       for (const [id,count] of Object.entries(haul)) save.inventory[id]=(save.inventory[id]||0)+count;
       save.runs++; if(won) save.wins++; persist();
       lastFinish={won,final,placement,caught,gold,stage,haul:{...haul}}; chestOpened=false;
-      mode='results'; $('hud').classList.add('hidden'); screen.classList.remove('hidden'); renderResults();
+      mode='results'; $('hud').classList.add('hidden'); $('full-board').classList.add('hidden'); screen.classList.remove('hidden'); renderResults();
     }
     function renderResults() {
       const r=lastFinish; if(!r) return renderMenu();
@@ -558,6 +612,67 @@
       }
     }
 
+    function drawStageDetails(t) {
+      ctx.save();
+      if(stage===0){
+        for(let i=0;i<24;i++){
+          const y=((i*163.7)%(H+70))-30,side=i%2;
+          const x=side?riverRight(y)+14:riverLeft(y)-14;
+          ctx.strokeStyle=i%3===0?'rgba(166,213,149,.57)':'rgba(112,180,147,.45)';ctx.lineWidth=2;
+          ctx.beginPath();ctx.moveTo(x,y+8);ctx.quadraticCurveTo(x+(side?10:-10),y-7,x+(side?8:-8),y-14);ctx.stroke();
+          ctx.beginPath();ctx.moveTo(x,y+8);ctx.lineTo(x+(side?-3:3),y-8);ctx.stroke();
+          if(i%3===0){ctx.fillStyle='rgba(230,231,181,.32)';ctx.beginPath();ctx.ellipse(x+(side?17:-17),y+15,5,3,.4,0,7);ctx.fill();}
+        }
+      } else if(stage===1){
+        for(let i=0;i<21;i++){
+          const y=((i*137.9)%(H+60))-25,side=i%2;
+          const x=(side?riverRight(y)-27:riverLeft(y)+27)+Math.sin(t*.7+i)*6;
+          if(i%4===0){ctx.fillStyle='rgba(216,184,229,.24)';ctx.beginPath();ctx.ellipse(x,y,15,6,.4,0,7);ctx.fill();}
+          ctx.globalAlpha=.35+.35*(Math.sin(t*2.5+i*1.8)**2);
+          ctx.shadowColor='#efd8ff';ctx.shadowBlur=12;ctx.fillStyle='#f6dafa';
+          ctx.beginPath();ctx.arc(x+(side?17:-17),y+Math.sin(t*2+i)*8,1.5+i%3*.55,0,7);ctx.fill();
+        }
+        ctx.globalAlpha=1;ctx.shadowBlur=0;
+      } else if(stage===2){
+        for(let i=0;i<18;i++){
+          const y=((i*151.3)%(H+90))-40,side=i%2,x=side?riverRight(y)+9:riverLeft(y)-9,sign=side?1:-1;
+          ctx.fillStyle=i%3===0?'rgba(115,211,240,.31)':'rgba(124,190,230,.17)';
+          ctx.strokeStyle='rgba(147,237,255,.38)';ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(x,y+17);ctx.lineTo(x+sign*(13+i%3*6),y-15-i%4*5);ctx.lineTo(x+sign*22,y+24);ctx.closePath();ctx.fill();ctx.stroke();
+        }
+        for(let i=0;i<4;i++){
+          const x=riverLeft(0)+40+i*(riverRight(0)-riverLeft(0))/5;
+          const beam=ctx.createLinearGradient(x,0,x+95,H);beam.addColorStop(0,'rgba(145,235,255,.075)');beam.addColorStop(1,'rgba(145,235,255,0)');
+          ctx.fillStyle=beam;ctx.beginPath();ctx.moveTo(x,-20);ctx.lineTo(x+21,-20);ctx.lineTo(x+124,H);ctx.lineTo(x+83,H);ctx.closePath();ctx.fill();
+        }
+      } else if(stage===3){
+        for(let i=0;i<30;i++){
+          const y=((i*103.5+t*21)%(H+80))-40,side=i%2,x=(side?riverRight(y)+14:riverLeft(y)-14)+(side?1:-1)*(i%4*7);
+          if(i%4===0){ctx.strokeStyle='rgba(255,146,111,.44)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x-12,y+11);ctx.lineTo(x,y-2);ctx.lineTo(x+8,y+5);ctx.stroke();}
+          ctx.fillStyle=i%5===0?'rgba(255,218,159,.8)':'rgba(244,117,110,.4)';
+          ctx.shadowColor='#ee805f';ctx.shadowBlur=i%5===0?11:0;
+          ctx.beginPath();ctx.arc(x,y,1.3+i%3*.48,0,7);ctx.fill();
+        }
+        ctx.shadowBlur=0;
+      } else {
+        const cx=(riverLeft(H*.5)+riverRight(H*.5))*.5,cy=H*.47;
+        ctx.translate(cx,cy);ctx.rotate(t*.035);
+        ctx.strokeStyle='rgba(249,211,150,.15)';ctx.lineWidth=2;ctx.setLineDash([12,23]);
+        ctx.beginPath();ctx.arc(0,0,Math.min(W*.25,190),0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+        ctx.strokeStyle='rgba(211,210,253,.11)';ctx.beginPath();ctx.arc(0,0,Math.min(W*.18,125),0,Math.PI*2);ctx.stroke();
+        ctx.rotate(-t*.035);ctx.translate(-cx,-cy);
+        for(let i=0;i<44;i++){
+          const y=((i*193.7+t*30)%(H+60))-30;
+          const x=riverLeft(y)+18+((i*79.3)%371)/371*(riverRight(y)-riverLeft(y)-36);
+          const flicker=.22+.45*Math.sin(t*2+i*1.4)**2;
+          ctx.globalAlpha=flicker;ctx.fillStyle=i%5===0?'#ffe5ad':'#a9deff';
+          ctx.beginPath();ctx.arc(x,y,i%9===0?2.2:1,0,7);ctx.fill();
+        }
+        ctx.globalAlpha=1;
+      }
+      ctx.restore();
+    }
+
     function drawGround(t) {
       const s=stages[stage];
       const bg=ctx.createLinearGradient(0,0,W,H); bg.addColorStop(0,s.top);bg.addColorStop(.57,s.water);bg.addColorStop(1,s.bottom);
@@ -566,10 +681,10 @@
       const step=24;
       ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(riverLeft(0),0);
       for(let y=step;y<=H+step;y+=step) ctx.lineTo(riverLeft(y),y);
-      ctx.lineTo(0,H);ctx.closePath();ctx.fillStyle='#163039';ctx.fill();
+      ctx.lineTo(0,H);ctx.closePath();ctx.fillStyle=['#183a38','#292d47','#142c48','#3c2534','#161e3b'][stage];ctx.fill();
       ctx.beginPath();ctx.moveTo(W,0);ctx.lineTo(riverRight(0),0);
       for(let y=step;y<=H+step;y+=step) ctx.lineTo(riverRight(y),y);
-      ctx.lineTo(W,H);ctx.closePath();ctx.fillStyle='#142c34';ctx.fill();
+      ctx.lineTo(W,H);ctx.closePath();ctx.fillStyle=['#183537','#28283f','#182845','#332633','#18203b'][stage];ctx.fill();
       for(let side=0;side<2;side++) {
         ctx.beginPath();for(let y=0;y<=H+step;y+=step) {const x=(side?riverRight(y):riverLeft(y));if(!y)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
         ctx.strokeStyle=side?'rgba(154,233,211,.42)':'rgba(193,243,219,.5)';ctx.lineWidth=3;ctx.stroke();
@@ -593,10 +708,11 @@
           if(y%3===0) {ctx.fillStyle='rgba(127,193,160,.35)';ctx.beginPath();ctx.arc(side?W-27:20,yy+16,2.5,0,7);ctx.fill();}
         }
       }
+      drawStageDetails(t);
       const bx=W*.85,by=H*.84;
       ctx.save();ctx.translate(bx,by);ctx.rotate(-.08);
-      ctx.fillStyle='#70584a';ctx.fillRect(-58,-55,Math.max(100,W*.17),Math.max(125,H*.2));
-      ctx.fillStyle='#967358';ctx.fillRect(-55,-60,Math.max(94,W*.17),Math.max(116,H*.2));
+      ctx.fillStyle=stage>=3?'#493b45':'#70584a';ctx.fillRect(-58,-55,Math.max(100,W*.17),Math.max(125,H*.2));
+      ctx.fillStyle=stage>=4?'#5c5875':stage>=3?'#775560':'#967358';ctx.fillRect(-55,-60,Math.max(94,W*.17),Math.max(116,H*.2));
       ctx.strokeStyle='rgba(48,37,38,.45)';ctx.lineWidth=3;
       for(let y=-44;y<H*.2;y+=22){ctx.beginPath();ctx.moveTo(-55,y);ctx.lineTo(W*.17+38,y);ctx.stroke();}
       ctx.restore();
@@ -777,9 +893,40 @@
         ctx.fillStyle='#f6dfa4';ctx.font='700 12px system-ui';ctx.fillText(f.kind.name,x+24,y-16);
       }
     }
+    function drawPrediction(t) {
+      if(mode!=='playing'||activeGear.ui<1)return;
+      if(activeGear.ui===1){
+        if(!charge&&!cast&&!hooked&&isWater(pointer.x,pointer.y)){
+          ctx.strokeStyle='rgba(183,246,215,.48)';ctx.lineWidth=1.2;
+          ctx.beginPath();ctx.arc(pointer.x,pointer.y,17+Math.sin(t*3)*2,0,Math.PI*2);ctx.stroke();
+        }
+        return;
+      }
+      const focus=isWater(pointer.x,pointer.y)?pointer:{x:W*.51,y:H*.5};
+      let chosen=null,best=Infinity;
+      for(const f of fish){
+        if(f.kind.need>activeGear.power||f.y<12||f.y>H-115)continue;
+        const d=Math.hypot(f.x-focus.x,f.y-focus.y);
+        if(d<best){best=d;chosen=f;}
+      }
+      if(!chosen)return;
+      const nextY=clamp(chosen.y+chosen.speed*.55,20,H-28);
+      ctx.save();ctx.setLineDash([4,6]);ctx.strokeStyle='rgba(165,248,222,.62)';ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(chosen.x,chosen.y+11);ctx.lineTo(chosen.x,nextY);ctx.stroke();ctx.setLineDash([]);
+      ctx.strokeStyle='rgba(166,250,222,.78)';ctx.beginPath();ctx.arc(chosen.x,nextY,11+Math.sin(t*4)*2,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle='#d0ffe7';ctx.font='700 10px system-ui';ctx.fillText(`提前 ${Math.round(chosen.speed*.55)} px`,chosen.x+16,nextY-7);
+      if(activeGear.ui>=4){
+        for(const f of fish){if(f.kind.value<70||f.y<20||f.y>H-20)continue;
+          ctx.fillStyle=f.kind.tier>=3?'#ffe0ae':'#bcf7e7';ctx.font='700 10px system-ui';
+          ctx.fillText(`${f.kind.name} · ${f.kind.value}G`,f.x+f.kind.size*.45,f.y-4);
+        }
+      }
+      ctx.restore();
+    }
     function draw(t) {
       drawGround(t);
       for(const f of fish) drawFish(f,t);
+      drawPrediction(t);
       drawFishing(t);drawRod(t);
       if(activeGear.ui>=3&&mode==='playing') {
         ctx.strokeStyle='rgba(250,221,154,.26)';ctx.lineWidth=1;
@@ -850,10 +997,15 @@
       notify('已发送到本地模拟频道');
     }
     $('chat-send').addEventListener('click',sendChat);
+    $('board-open').addEventListener('click',()=>toggleFullBoard(true));
+    $('board-close').addEventListener('click',()=>toggleFullBoard(false));
+    $('full-board').addEventListener('click',event=>{if(event.target===$('full-board'))toggleFullBoard(false);});
     $('touch-reel').addEventListener('pointerdown',event=>{event.preventDefault();reelTap();});
     $('touch-release').addEventListener('click',()=>{if(hooked)releaseFish('已主动放生，继续寻找合适的鱼');});
+    $('touch-chat').addEventListener('click',()=>{if(mode==='playing'){$('chat-box').classList.remove('hidden');$('chat-input').focus();}});
     window.addEventListener('keydown',event=>{
       if(mode!=='playing')return;
+      if(event.key==='Escape'&&!$('full-board').classList.contains('hidden')){toggleFullBoard(false);return;}
       if(document.activeElement===$('chat-input')) {
         if(event.key==='Enter'){event.preventDefault();sendChat();}
         if(event.key==='Escape'){$('chat-box').classList.add('hidden');$('chat-input').blur();}
@@ -862,6 +1014,7 @@
       if(event.code==='Space'){event.preventDefault();if(!event.repeat)reelTap();}
       else if(event.key.toLowerCase()==='r'&&hooked)releaseFish('已主动放生，试试钓更小的鱼');
       else if(event.key==='Tab'){event.preventDefault();forceBoard=!forceBoard;updateHUD();}
+      else if(event.key.toLowerCase()==='l'){event.preventDefault();toggleFullBoard($('full-board').classList.contains('hidden'));}
       else if(event.key==='Enter'){event.preventDefault();$('chat-box').classList.remove('hidden');$('chat-input').focus();}
     });
     resize(); renderMenu(); requestAnimationFrame(frame);
