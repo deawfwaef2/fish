@@ -31,7 +31,7 @@ class Game {
     }
     this.installEvents();this.renderMenu();
     this.world.setRodAppearance(this.active.rod.ui);
-    for(let i=0;i<85;i++)this.fish.push(this.newFish(true));
+    for(let i=0;i<this.fishCapacity();i++)this.fish.push(this.newFish(true));
     this.frame=requestAnimationFrame(t=>this.update(t));
   }
   loadSave(){
@@ -85,7 +85,7 @@ class Game {
       <p class="menu-intro">在白浪间穿行。与河岸上的 99 名本地模拟钓手争夺鱼群。<br>每轮 60 秒、每轮淘汰一半；坚持到星渊决战，争取第一名与神秘宝箱。</p>
       <div class="profile"><label for="player-name">参赛昵称</label><input id="player-name" maxlength="12" value="${safe(this.save.name)}"><span>${safe(this.title())} · ID ${safe(this.save.pid)}</span></div>
       <div class="menu-actions"><button class="btn primary" data-action="start">进入 3D 河道 ↗</button><button class="btn" data-action="shop">鱼仓与装备</button></div>
-      <div class="menu-controls"><span>W A S D 在岸边走动</span><span>鼠标在河面长按蓄力 / 松开抛竿</span><span>空格连按收线 · R 放生</span><span>Tab 排行 · Enter 聊天</span></div>
+      <div class="menu-controls"><span>W A S D / 手机摇杆移动</span><span>河面长按蓄力 / 松开抛竿</span><span>空格 / 手机按钮收线 · R 放生</span><span>Tab 排行 · Enter 聊天</span></div>
       <p class="menu-small">固定斜俯视镜头 · 真正的 WebGL 三维人物与场景 · 双击 HTML 离线游玩<br>岸上的对手、战绩与聊天全部由本机模拟，并非联网真人。档案只保存在当前浏览器。<br>下一局装备：${safe(this.active.name)}${this.active.bonus?' · 双件共鸣':''} · 已比赛 ${this.save.runs} 局 · 冠军 ${this.save.wins} 次</p>`;
   }
   renderShop(){
@@ -136,14 +136,17 @@ class Game {
     this.bots=this.makeBots();this.world.setBots(this.bots);
     this.me={id:0,name:this.save.name,title:this.title(),score:0,me:true,alive:true};
     this.alive=[this.me,...this.bots];this.botChatTimer=rand(5,9);this.hudTimer=0;this.labelTimer=0;
-    this.clearFish();for(let i=0;i<85;i++)this.fish.push(this.newFish(true));
+    this.clearFish();for(let i=0;i<this.fishCapacity();i++)this.fish.push(this.newFish(true));
     this.world.applyStage(0);document.body.dataset.ui=String(this.active.ui);
     $('identity').textContent=`${this.save.name} · ${this.title()} · ID ${this.save.pid} · 本地模拟赛`;
     $('chat-lines').replaceChildren();this.postChat('系统','本轮 100 人，60 秒后淘汰后 50 人。这里全部是本地模拟对手。');
-    this.setMode('playing');this.hint('WASD 在岸边走动 · 对准水面 <strong>按住左键</strong> 蓄力抛竿 · 空格收线');
+    this.setMode('playing');this.hint(matchMedia('(pointer:coarse)').matches?
+      '左下摇杆移动 · 在水面<strong>长按</strong>蓄力抛竿 · 右下按钮收线':
+      'WASD 在岸边走动 · 对准水面 <strong>按住左键</strong> 蓄力抛竿 · 空格收线');
     this.updateHUD();this.stageBanner('100 人入场 · 每 60 秒淘汰后半区');
   }
   clearFish(){for(const f of this.fish)this.world.removeFish(f.mesh);this.fish=[];}
+  fishCapacity(){return this.world.canvas.clientWidth<700?58:76;}
   fishWeight(k){
     if(k.tier>Math.min(4,this.stage+1))return 0;
     if(k.tier>this.stage)return k.weight*.025;
@@ -232,6 +235,17 @@ class Game {
       }
     }
   }
+  moveSurvivorsCloser(){
+    // After a cut, the remaining physical anglers gather near the next arena.
+    // Their identity, title, score and individual cast/walk animation stay intact.
+    const rivals=this.alive.filter(p=>!p.me).sort((a,b)=>a.id-b.id);
+    const span=[75,58,42,27,16][this.stage];
+    rivals.forEach((b,i)=>{
+      b.side=i%2?-1:1;b.x=b.side*(9.18+(i%3)*.81);
+      b.z=clamp(this.player.z+(i-(rivals.length-1)/2)*span*2/Math.max(1,rivals.length-1),-87,87);
+      if(b.side===1&&Math.abs(b.z-this.player.z)<7)b.z+=b.z<this.player.z?-8:8;
+    });
+  }
   nextRound(){
     if(this.mode!=='playing')return;
     const sorted=this.sortPlayers();
@@ -242,9 +256,10 @@ class Game {
     const survivors=new Set(this.alive);
     for(const b of this.bots)b.alive=survivors.has(b);
     this.stage++;this.timeLeft=ROUND_SECONDS;this.cast=null;this.charge=null;
+    this.moveSurvivorsCloser();
     if(this.hooked){this.hooked.fish.hooked=false;this.hooked=null;}
     $('fight').classList.add('hidden');$('charge').classList.add('hidden');
-    this.clearFish();for(let i=0;i<85;i++)this.fish.push(this.newFish(true));
+    this.clearFish();for(let i=0;i<this.fishCapacity();i++)this.fish.push(this.newFish(true));
     this.world.applyStage(this.stage);this.updateHUD();
     this.stageBanner(this.stage===4?`剩余 ${this.alive.length} 人 · 夺得第一名即可开宝箱`:`晋级 ${this.alive.length} 人 · 全新鱼群抵达`);
     this.notify(`晋级！进入 ${STAGES[this.stage].name} · 剩余 ${this.alive.length} 人`);

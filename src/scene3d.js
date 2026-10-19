@@ -10,7 +10,10 @@ const shared = {
  box:new THREE.BoxGeometry(1,1,1),
  cone:new THREE.ConeGeometry(1,1,7),
  cylinder:new THREE.CylinderGeometry(1,1,1,7),
- fin:new THREE.BufferGeometry()
+ fin:new THREE.BufferGeometry(),
+ bill:new THREE.CylinderGeometry(.025,.14,.85,5),
+ whisker:new THREE.CylinderGeometry(.012,.015,.55,4),
+ antenna:new THREE.CylinderGeometry(.014,.018,.72,4)
 };
 shared.fin.setAttribute('position',new THREE.Float32BufferAttribute([
   -.5,0,-.45, .5,0,-.45, 0,0,-1.12,
@@ -56,7 +59,7 @@ export class World3D {
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
     this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure=1.66;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,window.innerWidth<700?1.25:1.6));
     this.renderer.shadowMap.enabled=true;
     this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     this.scene=new THREE.Scene();
@@ -75,15 +78,19 @@ export class World3D {
     this.makeTerrain();
     this.makeWater();
     this.makeRapids();
+    this.makeBiomes();
     this.makeCharacters();
     this.makeCastVisuals();
+    this.fishMats=new Map();
+    this.fishEyeMat=new THREE.MeshBasicMaterial({color:0x173945});
+    this.fishBulbMat=new THREE.MeshBasicMaterial({color:0xffe8ab});
     this.applyStage(0);
     this.resize();
   }
   makeLights(){
     this.ambient=new THREE.HemisphereLight(0xdffeff,0x426351,2.0);this.scene.add(this.ambient);
     this.sun=new THREE.DirectionalLight(0xffdbb4,3.2);this.sun.position.set(-24,45,-36);
-    this.sun.castShadow=true;this.sun.shadow.mapSize.set(1024,1024);
+    this.sun.castShadow=true;this.sun.shadow.mapSize.set(512,512);
     this.sun.shadow.camera.left=-45;this.sun.shadow.camera.right=45;
     this.sun.shadow.camera.top=45;this.sun.shadow.camera.bottom=-45;
     this.sun.shadow.normalBias=.07;this.scene.add(this.sun);
@@ -107,6 +114,7 @@ export class World3D {
       pebble.position.set(x,.67,z);pebble.rotation.y=seed(i+23)*Math.PI;this.scene.add(pebble);
     }
     const leaves=material(0x3d866c,{roughness:1}),trunk=material(0x715646);
+    this.leafMat=leaves;this.trunkMat=trunk;
     for(let i=0;i<82;i++){
       const sign=i%2?1:-1,z=(seed(i*17+5)-.5)*200,x=sign*(10.9+seed(i+4)*12);
       const tree=new THREE.Group();
@@ -180,6 +188,42 @@ export class World3D {
       crest.rotation.set(-Math.PI/2,0,Math.sin(j*.9)*.7);crest.position.set(x,.07,z);
       this.scene.add(crest);
     }
+  }
+  makeBiomes(){
+    // Each round changes its actual 3D shoreline, not merely the water tint.
+    // A biome is a few instanced meshes and therefore cheap even in the offline build.
+    const schemes=[
+      {geometry:new THREE.ConeGeometry(.085,.85,4),colors:[0x83c49d,0x69a591,0xb1c8a5],height:.91,count:125},
+      {geometry:new THREE.IcosahedronGeometry(.25,0),colors:[0xc7a6eb,0x9ccbe6,0xf3d3b4],height:1.55,count:88,emissive:0x4d3378},
+      {geometry:new THREE.ConeGeometry(.43,2.2,5),colors:[0xa6ecf5,0x8bbdda,0xd4faff],height:1.53,count:66,emissive:0x164e6a},
+      {geometry:new THREE.ConeGeometry(.35,2.0,5),colors:[0xed9872,0x9b5960,0xf0c38b],height:1.53,count:81,emissive:0x5c222a},
+      {geometry:new THREE.OctahedronGeometry(.43,0),colors:[0xf3d795,0xadd6ec,0xe4b1ef],height:1.8,count:84,emissive:0x5c4a9c}
+    ];
+    this.biomes=schemes.map((style,index)=>{
+      const m=new THREE.MeshStandardMaterial({color:0xffffff,emissive:style.emissive||0x0a1916,emissiveIntensity:index?0.6:.15,roughness:.36,metalness:index===4?.37:.07});
+      const mesh=new THREE.InstancedMesh(style.geometry,m,style.count);
+      mesh.frustumCulled=false;
+      for(let i=0;i<style.count;i++){
+        const side=i%2?1:-1,z=(seed(i*31+index*173)-.5)*204;
+        const offset=index===0?8.3+seed(i*19+9)*1.0:9.4+seed(i*19+9)*10.1;
+        const x=side*offset,scale=(.62+seed(i*27+5)*.96)*(index===3?.83:1);
+        this.dummy.position.set(x,style.height+(index===1?seed(i*8+3)*1.05:0),z);
+        this.dummy.scale.setScalar(scale);this.dummy.rotation.set(0,seed(i*17)*Math.PI*2,0);
+        this.dummy.updateMatrix();mesh.setMatrixAt(i,this.dummy.matrix);
+        mesh.setColorAt(i,new THREE.Color(style.colors[i%style.colors.length]));
+      }
+      mesh.visible=false;this.scene.add(mesh);return mesh;
+    });
+    // Extra luminous rune hoops become visible only in the final arena.
+    const rings=new THREE.InstancedMesh(new THREE.TorusGeometry(.7,.026,4,24),new THREE.MeshBasicMaterial({color:0xffd99a,transparent:true,opacity:.67,side:THREE.DoubleSide}),35);
+    rings.frustumCulled=false;
+    for(let i=0;i<35;i++){
+      this.dummy.position.set((i%2?1:-1)*(9.4+seed(i*6+19)*7),.8,(seed(i*21+7)-.5)*184);
+      this.dummy.scale.setScalar(.7+seed(i*13)*.6);
+      this.dummy.rotation.set(-Math.PI/2,0,seed(i)*Math.PI*2);
+      this.dummy.updateMatrix();rings.setMatrixAt(i,this.dummy.matrix);
+    }
+    rings.visible=false;this.scene.add(rings);this.runeRings=rings;
   }
   makeHuman(isPlayer=false){
     const g=new THREE.Group();
@@ -273,13 +317,16 @@ export class World3D {
     this.waterUniforms.uLight.value.set(s.water);this.waterUniforms.uDeep.value.set(s.sky);this.waterUniforms.uFoam.value.set(s.foam);
     this.bankMat.color.set(s.bank);this.rockMat.color.set(index>=3?0x755060:0x4c6b69);
     this.streakMat.color.set(s.foam);this.splashMat.color.set(s.foam);this.sun.color.set(s.light);
+    this.leafMat.color.set([0x3d866c,0x745c91,0x75a6b5,0x733e57,0x546094][index]);
+    this.trunkMat.color.set([0x715646,0x59405c,0x556c85,0x4a313d,0x383e68][index]);
+    this.biomes.forEach((mesh,i)=>{mesh.visible=i===index;});this.runeRings.visible=index===4;
     this.sun.intensity=index>=3?2.2:3.2;this.ambient.intensity=index===4?1.35:2.0;
   }
   resize(){
     const w=Math.max(320,this.canvas.clientWidth),h=Math.max(430,this.canvas.clientHeight),aspect=w/h;
     const height=w<700?37:25;this.camera.left=-height*aspect/2;this.camera.right=height*aspect/2;
     this.camera.top=height/2;this.camera.bottom=-height/2;this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w,h,false);this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
+    this.renderer.setSize(w,h,false);this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,w<700?1.25:1.6));
   }
   onWater(clientX,clientY){
     const r=this.canvas.getBoundingClientRect();
@@ -406,8 +453,12 @@ export class World3D {
   }
   makeFish(kind){
     const g=new THREE.Group(),r=kind.radius;
-    const bodyMat=material(kind.color,{metalness:kind.tier>=3?.28:.11,roughness:.48});
-    const underMat=material(new THREE.Color(kind.color).multiplyScalar(.63),{roughness:.69});
+    if(!this.fishMats.has(kind.id))this.fishMats.set(kind.id,{
+      body:material(kind.color,{metalness:kind.tier>=3?.28:.11,roughness:.48}),
+      under:material(new THREE.Color(kind.color).multiplyScalar(.63),{roughness:.69}),
+      fin:new THREE.MeshStandardMaterial({color:kind.color,roughness:.59,side:THREE.DoubleSide})
+    });
+    const {body:bodyMat,under:underMat,fin:finMat}=this.fishMats.get(kind.id);
     let sx=.42*r,sy=.31*r,sz=1.11*r;
     if(kind.shape==='eel'){sx=.24*r;sy=.20*r;sz=1.48*r;}
     if(kind.shape==='giant'){sx=.57*r;sy=.37*r;sz=1.18*r;}
@@ -417,9 +468,10 @@ export class World3D {
     const body=new THREE.Mesh(shared.sphere,bodyMat);body.scale.set(sx,sy,sz);body.castShadow=false;g.add(body);
     const belly=new THREE.Mesh(shared.sphere,underMat);belly.scale.set(sx*.93,sy*.60,sz*.9);belly.position.y=-sy*.5;g.add(belly);
     const tail=new THREE.Group();tail.position.z=-sz*.85;g.add(tail);
-    const tailFin=new THREE.Mesh(shared.fin,new THREE.MeshStandardMaterial({color:kind.color,roughness:.59,side:THREE.DoubleSide}));
+    const tailFin=new THREE.Mesh(shared.fin,finMat);
     tailFin.scale.set(r*.99,1,r*.75);tailFin.position.y=.07;tail.add(tailFin);
-    const dorsal=new THREE.Mesh(new THREE.ConeGeometry(.27*r,.61*r,3),underMat);
+    const dorsal=new THREE.Mesh(shared.cone,underMat);
+    dorsal.scale.set(.27*r,.61*r,.27*r);
     dorsal.position.set(0,sy*.92,-.13*r);dorsal.rotation.z=.16;g.add(dorsal);
     if(kind.shape==='ray'){
       for(const sign of [-1,1]){
@@ -428,32 +480,33 @@ export class World3D {
       }
     }
     if(kind.shape==='shark'||kind.shape==='sword'){
-      dorsal.scale.set(1.5,1.4,1.3);
-      const bill=new THREE.Mesh(new THREE.CylinderGeometry(.025*r,.14*r,.85*r,5),bodyMat);
-      bill.position.z=sz*1.12;bill.rotation.x=Math.PI/2;g.add(bill);
+      dorsal.scale.multiply(V(1.5,1.4,1.3));
+      const bill=new THREE.Mesh(shared.bill,bodyMat);
+      bill.scale.setScalar(r);bill.position.z=sz*1.12;bill.rotation.x=Math.PI/2;g.add(bill);
     }
     if(kind.shape==='puffer'||kind.shape==='spined')for(let i=0;i<12;i++){
-      const a=i*Math.PI/6;const spike=new THREE.Mesh(new THREE.ConeGeometry(.075*r,.31*r,4),underMat);
+      const a=i*Math.PI/6;const spike=new THREE.Mesh(shared.cone,underMat);
+      spike.scale.set(.075*r,.31*r,.075*r);
       spike.position.set(Math.cos(a)*sx*.98,sy*.35,Math.sin(a)*sz*.67);
       spike.rotation.z=-Math.cos(a)*.85;spike.rotation.x=Math.sin(a)*.8;g.add(spike);
     }
     if(kind.shape==='whisker')for(const sign of [-1,1]){
-      const whisker=new THREE.Mesh(new THREE.CylinderGeometry(.012,.015,.55*r,4),bodyMat);
-      whisker.position.set(sign*sx*.7,.08,sz*.91);whisker.rotation.z=sign*.7;g.add(whisker);
+      const whisker=new THREE.Mesh(shared.whisker,bodyMat);
+      whisker.scale.setScalar(r);whisker.position.set(sign*sx*.7,.08,sz*.91);whisker.rotation.z=sign*.7;g.add(whisker);
     }
     if(kind.shape==='angler'){
-      const stem=new THREE.Mesh(new THREE.CylinderGeometry(.014,.018,.72*r,4),underMat);
-      stem.position.set(0,.46*r,.6*r);stem.rotation.x=.5;g.add(stem);
-      const bulb=new THREE.Mesh(new THREE.SphereGeometry(.11*r,8,5),new THREE.MeshBasicMaterial({color:0xffe8ab}));
-      bulb.position.set(0,.82*r,.73*r);g.add(bulb);
+      const stem=new THREE.Mesh(shared.antenna,underMat);
+      stem.scale.setScalar(r);stem.position.set(0,.46*r,.6*r);stem.rotation.x=.5;g.add(stem);
+      const bulb=new THREE.Mesh(shared.sphere,this.fishBulbMat);
+      bulb.scale.setScalar(.11*r);bulb.position.set(0,.82*r,.73*r);g.add(bulb);
     }
-    const eyeMat=new THREE.MeshBasicMaterial({color:0x173945});
     for(const sign of [-1,1]){
-      const eye=new THREE.Mesh(new THREE.SphereGeometry(Math.max(.038,.08*r),6,5),eyeMat);
+      const eye=new THREE.Mesh(shared.sphere,this.fishEyeMat);
+      eye.scale.setScalar(Math.max(.038,.08*r));
       eye.position.set(sign*sx*.88,sy*.42,sz*.73);g.add(eye);
     }
-    if(kind.tier>=3){
-      const shine=new THREE.PointLight(kind.color,.65,4,2);shine.position.set(0,.46,0);if(kind.id==='leviathan')g.add(shine);
+    if(kind.id==='leviathan'){
+      const shine=new THREE.PointLight(kind.color,.65,4,2);shine.position.set(0,.46,0);g.add(shine);
     }
     g.userData={tail,body,kind};this.scene.add(g);return g;
   }
