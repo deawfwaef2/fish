@@ -157,9 +157,11 @@ export class World3D {
     this.cliffs.frustumCulled=false;
     for(let i=0;i<128;i++){
       const sign=i%2?1:-1;
-      const x=sign*(24.7+seed(i*31+8)*4.3);
+      // Camera looks from the right bank: keep near-wall slabs below the sightline.
+      // The far wall remains tall to convey canyon pressure without hiding the action.
+      const x=sign<0?-(25.4+seed(i*31+8)*3.3):31.5+seed(i*31+8)*4.2;
       const z=(seed(i*17+5)-.5)*214;
-      const h=2.1+seed(i*37+3)*3.7;
+      const h=sign<0?3.0+seed(i*37+3)*3.7:1.05+seed(i*37+3)*1.15;
       this.dummy.position.set(x,.4+h*.58,z);
       this.dummy.rotation.set(seed(i*19)*.15,seed(i*7)*Math.PI,.18*seed(i*3));
       this.dummy.scale.set(1.5+seed(i*29)*1.5,h,1.7+seed(i*11)*1.6);
@@ -207,11 +209,14 @@ export class World3D {
     this.rockMat=material(0x526868,{roughness:1});
     this.rockGroups=[];const foam=[];
     for(let i=0;i<34;i++){
-      const r=.39+seed(i*5+8)*.95;
-      const x=(seed(i*7+11)-.5)*12,z=-92+i*5.53+(seed(i+27)-.5)*3.4;
+      // Low, partly submerged stones leave the camera-facing channel unobstructed.
+      const shore=i%5!==0,side=i%2?1:-1;
+      const r=(shore?.23:.20)+seed(i*5+8)*(shore?.31:.17);
+      const x=shore?side*(5.75+seed(i*7+11)*1.36):(seed(i*7+11)-.5)*8.5;
+      const z=-92+i*5.53+(seed(i+27)-.5)*3.4;
       const rock=new THREE.Mesh(shared.lowSphere,this.rockMat);
-      rock.scale.set(r*1.16,r*.87,r*.95);rock.position.set(x,.13,z);
-      rock.castShadow=i%3===0;this.scene.add(rock);
+      rock.scale.set(r*1.28,r*.55,r*.92);rock.position.set(x,-.11,z);
+      rock.castShadow=false;this.scene.add(rock);
       this.rockGroups.push({x,z,r,mesh:rock});
       for(let j=0;j<8;j++){
         const angle=seed(i*19+j*31)*Math.PI*2;
