@@ -74,6 +74,11 @@
     .rules { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0 13px; }
     .rule { padding:10px 12px; border:1px solid rgba(208,248,229,.13); border-radius:8px; background:rgba(202,240,223,.045); color:#bbd0cc; font-size:11px; }
     .footnote { color:#93aaa9; font-size:11px; line-height:1.6; }
+    .profile-setup { display:flex; align-items:center; gap:13px; flex-wrap:wrap; margin:13px 0 2px; color:#b6d1cb; font-size:11px; }
+    .profile-setup label { display:flex; align-items:center; gap:9px; }
+    .profile-setup input { width:140px; padding:8px 10px; outline:none; border:1px solid rgba(168,227,205,.34); border-radius:7px; background:rgba(19,54,60,.85); color:#f5f9ea; font-size:12px; }
+    .profile-setup input:focus { border-color:#b5ead9; }
+    .profile-setup span { color:#e1bd86; letter-spacing:.07em; }
     .results-stat { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0; }
     .stat { min-width:110px; padding:12px 14px; border:1px solid rgba(225,244,226,.2); border-radius:9px; background:rgba(231,248,226,.07); }
     .stat small { display:block; color:#a0bcb8; font-size:10px; letter-spacing:.14em; }
@@ -118,7 +123,7 @@
     <div id="gear-frame" aria-hidden="true"></div>
     <div id="hud" class="hidden">
       <div class="topbar">
-        <div class="mark"><div class="mark-icon">◇</div><div><strong>深流 / DEEP CURRENT</strong><small>RIVER ROYALE · 离线模拟赛</small></div></div>
+        <div class="mark"><div class="mark-icon">◇</div><div><strong>深流 / DEEP CURRENT</strong><small id="profile-label">RIVER ROYALE · 离线模拟赛</small></div></div>
         <div class="meta"><div class="pill" id="clock">倒计时 <em>60</em></div><div class="pill">金币 <em id="gold">0</em></div><div class="pill">排名 <em id="rank">--</em></div></div>
       </div>
       <div id="stage-label">第 1 阶段 · 初潮浅滩 · 100 位选手</div>
@@ -148,15 +153,25 @@
       { name:'星海王座', top:'#101d39', water:'#234476', bottom:'#111b3d', accent:'#ffdca0' }
     ];
     const species = [
-      { id:'silver', name:'银尾鱼', shape:'minnow', size:18, value:6, need:1.3, tier:0, weight:30, speed:85, color:'#b9ebdf' },
-      { id:'blue', name:'蓝鳞鱼', shape:'minnow', size:23, value:9, need:1.6, tier:0, weight:25, speed:70, color:'#78c7e5' },
+      { id:'silver', name:'银尾鱼', shape:'minnow', size:18, value:6, need:1.3, tier:0, weight:29, speed:85, color:'#b9ebdf' },
+      { id:'blue', name:'蓝鳞鱼', shape:'minnow', size:23, value:9, need:1.6, tier:0, weight:24, speed:70, color:'#78c7e5' },
+      { id:'needle', name:'细吻针鱼', shape:'needle', size:25, value:10, need:1.5, tier:0, weight:18, speed:108, color:'#c5ddb0' },
+      { id:'goby', name:'夜纹虾虎', shape:'perch', size:21, value:8, need:1.2, tier:0, weight:21, speed:57, color:'#b69fae' },
       { id:'perch', name:'纹鳍鲈', shape:'perch', size:29, value:15, need:2.0, tier:0, weight:19, speed:63, color:'#e9c889' },
+      { id:'catfish', name:'泥纹鲶', shape:'catfish', size:37, value:20, need:2.35, tier:0, weight:11, speed:52, color:'#a4b5aa' },
       { id:'carp', name:'绯纹鲤', shape:'koi', size:39, value:25, need:2.5, tier:0, weight:9, speed:55, color:'#ed9e78' },
       { id:'eel', name:'电纹鳗', shape:'eel', size:49, value:33, need:3.2, tier:1, weight:13, speed:85, color:'#91dfbf' },
       { id:'puffer', name:'灯笼河豚', shape:'puffer', size:43, value:43, need:3.8, tier:1, weight:9, speed:47, color:'#f2cd85' },
+      { id:'moon', name:'月盘鱼', shape:'moon', size:42, value:39, need:3.4, tier:1, weight:9, speed:48, color:'#f2b5a8' },
+      { id:'rapids', name:'激流梭鱼', shape:'needle', size:54, value:48, need:4.2, tier:1, weight:7, speed:126, color:'#bad9e0' },
+      { id:'butterfly', name:'镜蝶鱼', shape:'butterfly', size:53, value:65, need:4.8, tier:2, weight:9, speed:64, color:'#edd4a1' },
       { id:'ray', name:'琉璃鳐', shape:'ray', size:60, value:72, need:5.0, tier:2, weight:8, speed:64, color:'#93c6ed' },
+      { id:'sturgeon', name:'甲骨鲟', shape:'sturgeon', size:68, value:89, need:5.7, tier:2, weight:7, speed:58, color:'#adbcc1' },
       { id:'shark', name:'裂鳍鲨', shape:'shark', size:76, value:105, need:6.3, tier:2, weight:7, speed:89, color:'#90aebc' },
+      { id:'lion', name:'赤焰狮子鱼', shape:'lion', size:66, value:115, need:7.0, tier:3, weight:7, speed:53, color:'#f0a36e' },
       { id:'angler', name:'深海灯鱼', shape:'angler', size:70, value:130, need:7.2, tier:3, weight:6, speed:56, color:'#b897e3' },
+      { id:'sword', name:'赤潮剑鱼', shape:'sword', size:79, value:152, need:8.2, tier:3, weight:5, speed:111, color:'#d5859c' },
+      { id:'dragon', name:'星河龙鱼', shape:'dragon', size:95, value:187, need:9.2, tier:4, weight:6, speed:76, color:'#d2a5ee' },
       { id:'leviathan', name:'渊流巨鱼', shape:'leviathan', size:115, value:260, need:10.0, tier:4, weight:4, speed:51, color:'#e7bc82' }
     ];
     const gear = [
@@ -168,28 +183,44 @@
     ];
     const botNames = ['晚风来信','鲤鱼跃电门','AquaX','钓到月亮','小河豚','NullPointer','咸鱼不翻身','鱼见愁','北岸七号','深蓝回声','阿岚','海盐汽水','鱼塘策士','旧码头','星尘钩手','团子同学','拾光','乌云背后','青柠薄荷','摸鱼专家','浪里白条','石桥客','流萤','白噪音','潮生','捞月人','竹影','阿瓦达大鱼','偏爱浅滩','海边的猫','极夜','鱼竿没电','青空','迴游','白鸥','下班就钓鱼','永远空军','深海来客'];
     const titles = ['见习钓手','岸边旅人','摸鱼大师','逆流猎人','蓝鳍传说','满载而归','空军指挥官','潮汐观测员','河道冠军','深水漫游者'];
+    const botStyles = [
+      {id:'守岸',rate:1.18,miss:.11,large:.46},
+      {id:'快手',rate:.78,miss:.29,large:.83},
+      {id:'猎巨',rate:1.19,miss:.25,large:2.1},
+      {id:'捡漏',rate:1.02,miss:.16,large:.74},
+      {id:'暴走',rate:.72,miss:.33,large:1.28},
+      {id:'收藏',rate:1.10,miss:.18,large:1.20}
+    ];
     let W = 0, H = 0, DPR = 1, mode = 'menu', stage = 0, timeLeft = ROUND_TIME;
     let gold = 0, rank = 100, playerAlive = true, alive = [], bots = [], fish = [], haul = {}, activeGear = gear[0];
     let gameClock = 0, ambientClock = 0, botTick = 0, hudTick = 0, chatTick = 0, cast = null, hooked = null, charge = null, pointer = {x:0,y:0};
-    let forceBoard = false, toastTimeout = 0, chestOpened = false, lastFinish = null;
-    let save = readSave();
+    let forceBoard = false, toastTimeout = 0, chestOpened = false, lastFinish = null, pendingReplies = [], cutoffScore = 0;
+    let save;
     const rand = (a,b) => a + Math.random() * (b-a);
     const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
     const choice = arr => arr[Math.floor(Math.random()*arr.length)];
     const fmt = n => Math.floor(n).toLocaleString('zh-CN');
     const esc = text => String(text).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    save=readSave();
 
     function readSave() {
+      const fresh={owned:['reed'],inventory:{},wins:0,runs:0,name:'岸边旅人',pid:`R${Math.floor(1000+Math.random()*9000)}`};
       try {
-        const parsed = JSON.parse(localStorage.getItem(SAVE_KEY));
-        if (parsed && Array.isArray(parsed.owned) && parsed.inventory && typeof parsed.inventory === 'object') {
-          return { owned:[...new Set(['reed',...parsed.owned.filter(id => gear.some(g => g.id === id))])], inventory:parsed.inventory, wins:Number(parsed.wins)||0, runs:Number(parsed.runs)||0 };
+        const parsed=JSON.parse(localStorage.getItem(SAVE_KEY));
+        if(parsed&&Array.isArray(parsed.owned)&&parsed.inventory&&typeof parsed.inventory==='object') {
+          const inventory={};
+          for(const s of species) inventory[s.id]=clamp(Math.floor(Number(parsed.inventory[s.id])||0),0,99999);
+          return {owned:[...new Set(['reed',...parsed.owned.filter(id=>gear.some(g=>g.id===id))])],inventory,
+            wins:clamp(Math.floor(Number(parsed.wins)||0),0,99999),runs:clamp(Math.floor(Number(parsed.runs)||0),0,99999),
+            name:String(parsed.name||fresh.name).trim().slice(0,12)||fresh.name,
+            pid:/^R\d{4}$/.test(parsed.pid)?parsed.pid:fresh.pid};
         }
       } catch (_) {}
-      return { owned:['reed'], inventory:{}, wins:0, runs:0 };
+      return fresh;
     }
     function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) {} }
     function bestGear() { return [...gear].reverse().find(g => save.owned.includes(g.id)) || gear[0]; }
+    function playerTitle() { return save.wins>0?'潮汐冠军':['见习钓手','逆流猎人','逐潮观测员','深渊领主','星海王者'][bestGear().ui]; }
     function resize() {
       const rect = app.getBoundingClientRect();
       W = Math.max(320,rect.width); H = Math.max(420,rect.height);
@@ -210,11 +241,15 @@
       return {base:rodBase(),tip:{x:W*.76+power*20-whip*49+struggle,y:H*.45+power*16-whip*26+struggle*.6},power};
     }
     function rodTip() { return rodPose().tip; }
+    function speciesWeight(s) {
+      if (s.tier>stage) return s.weight*.035; // A tantalising glimpse of tomorrow's fish.
+      return s.weight*(s.tier===stage?1+stage*.8:Math.max(.13,1-(stage-s.tier)*.32));
+    }
     function pickSpecies() {
-      const pool = species.filter(s => s.tier <= Math.min(stage+1,4));
-      const total = pool.reduce((n,s) => n + s.weight * (s.tier > stage ? .06 : 1),0);
-      let roll = Math.random()*total;
-      for (const item of pool) { roll -= item.weight * (item.tier > stage ? .06 : 1); if (roll <= 0) return item; }
+      const pool=species.filter(s=>s.tier<=Math.min(stage+1,4));
+      const total=pool.reduce((n,s)=>n+speciesWeight(s),0);
+      let roll=Math.random()*total;
+      for(const item of pool){roll-=speciesWeight(item);if(roll<=0)return item;}
       return pool[0];
     }
     function createFish(initial=false) {
@@ -241,6 +276,7 @@
         <h1 class="hero-title">深<span>流</span><span style="display:block;font-size:.28em;letter-spacing:.26em;font-family:system-ui;font-weight:650;color:#e1eee8;margin-top:13px">DEEP CURRENT</span></h1>
         <div class="divider"></div>
         <p class="subtitle">抛出鱼钩，与 99 名对手争夺河流的馈赠。<br>每 60 秒淘汰一半选手。活到最后，在星海决战中摘下王冠。</p>
+        <div class="profile-setup"><label>参赛昵称 <input id="player-name" maxlength="12" value="${esc(save.name)}" aria-label="参赛昵称"></label><span>${esc(playerTitle())} · ID ${esc(save.pid)}</span></div>
         <div class="actions"><button class="btn primary" data-action="start">开始游戏 ↗</button><button class="btn" data-action="shop">鱼仓与装备</button></div>
         <div class="rules"><span class="rule">① 左键按住蓄力，松开抛竿</span><span class="rule">② 空格连按收线，R 放生</span><span class="rule">③ Tab 查看排名 · Enter 发言</span></div>
         <p class="footnote">离线可玩 · 99 名对手为本地模拟角色，并非联网真人 · 装备仅使用鱼购买，下一局生效<br>当前装备：${esc(bestGear().name)} · 累计游玩 ${save.runs} 局 · 胜利 ${save.wins} 次</p>`;
@@ -259,13 +295,31 @@
     }
 
     function makeBots() {
-      const botArray = Array.from({length:99},(_,i) => ({id:i+1,name:`${choice(botNames)}#${String(i+1).padStart(3,'0')}`,title:choice(titles),score:0,skill:rand(.65,1.62),risk:Math.random(),combo:0,chatTimer:rand(3,25)}));
-      return botArray;
+      const used=new Set([save.name]);
+      const endings=['_Q','·七','17','_Pro','·岚','_66','泡泡','77','_Y','·北','S2','08','小号'];
+      const result=[];
+      for(let i=0;i<99;i++) {
+        let name='';
+        for(let tries=0;tries<80;tries++){
+          const root=choice(botNames);
+          const candidate=root+(Math.random()<.27||used.has(root)?choice(endings):'');
+          if(!used.has(candidate)){name=candidate;break;}
+        }
+        if(!name)name=`潮汐钓友${i+11}`;
+        used.add(name);
+        result.push({id:i+1,name,title:choice(titles),score:0,skill:rand(.77,1.48),risk:Math.random(),
+          style:choice(botStyles),timer:rand(1,14),quiet:Math.random()<.08?rand(9,22):0,
+          combo:0,catches:0,misses:0,lastCatch:-50});
+      }
+      return result;
     }
     function startGame() {
+      const nameInput=$('player-name');
+      if(nameInput){save.name=nameInput.value.trim().slice(0,12)||'岸边旅人';persist();}
       activeGear=bestGear(); mode='playing'; stage=0; timeLeft=ROUND_TIME; gameClock=0; gold=0; rank=100; playerAlive=true;
-      bots=makeBots(); alive=[{id:0,name:'你',title:'岸边新手',score:0,me:true},...bots];
-      haul={}; cast=null; hooked=null; charge=null; forceBoard=false; botTick=0; hudTick=0; chatTick=0;
+      bots=makeBots(); alive=[{id:0,name:save.name,title:playerTitle(),pid:save.pid,score:0,me:true},...bots];
+      haul={}; cast=null; hooked=null; charge=null; forceBoard=false; botTick=0; hudTick=0; chatTick=rand(5,9); pendingReplies=[];
+      $('profile-label').textContent=`${save.name} · ${playerTitle()} · ID ${save.pid} · 离线模拟赛`;
       $('hud').classList.remove('hidden'); screen.classList.add('hidden'); $('fight').classList.add('hidden'); $('chat-box').classList.add('hidden');
       $('gear-frame').className=activeGear.ui>=3?'tier-3':activeGear.ui>=2?'tier-2':'';
       $('feed').classList.toggle('visible',activeGear.ui>=2);
@@ -281,12 +335,13 @@
     function updateHUD() {
       if (mode!=='playing') return;
       const sorted=sortPlayers(); rank=sorted.findIndex(p=>p.me)+1;
+      cutoffScore=sorted[stage===ROUNDS?0:Math.ceil(sorted.length/2)-1]?.score||0;
       $('clock').querySelector('em').textContent=Math.ceil(timeLeft);
       $('clock').classList.toggle('urgent',timeLeft<10);
       $('gold').textContent=fmt(gold); $('rank').textContent=`${rank}/${alive.length}`;
       $('stage-label').textContent=`${stage<ROUNDS?`第 ${stage+1} 阶段`:'最终决战'} · ${stages[stage].name} · ${alive.length} 位选手`;
       const top=sorted.slice(0,5);
-      if (!top.some(p=>p.me) && sorted.findIndex(p=>p.me)>5) top.push(sorted[rank-1]);
+      if (!top.some(p=>p.me) && sorted.findIndex(p=>p.me)>=5) top.push(sorted[rank-1]);
       $('board-rows').innerHTML=top.map(p=>`<div class="board-row ${p.me?'me':''}"><b>${sorted.indexOf(p)+1}</b><span title="${esc(p.title)}">${esc(p.name)}</span><strong>${fmt(p.score)}</strong></div>`).join('');
       $('board').classList.toggle('visible',activeGear.ui>=1||forceBoard);
       if (activeGear.ui>=2) {
@@ -302,25 +357,47 @@
       while ($('feed-lines').children.length>4) $('feed-lines').lastElementChild.remove();
     }
     function botCatch(bot) {
-      const bonus=1+stage*.43;
-      const amount=Math.round(rand(4,13)*bot.skill*bonus*(Math.random()<.045?.1:1));
-      bot.score+=amount;
-      bot.combo=(bot.combo+1)%7;
-      if (amount>32 && Math.random()<.06) postChat(bot.name,choice(['这条有点大！','差一点就脱钩了','今天手感不错']));
+      const power=2.1+bot.skill*.50+bot.risk*.32+stage*1.68;
+      const pool=species.filter(s=>s.tier<=stage&&s.need<=power);
+      if(!pool.length)return;
+      const weighted=pool.map(s=>({s,w:speciesWeight(s)*clamp(1+(s.need-2.2)*(bot.style.large-1)*.34,.2,3.5)}));
+      let roll=Math.random()*weighted.reduce((n,item)=>n+item.w,0);
+      let kind=pool[0];
+      for(const item of weighted){roll-=item.w;if(roll<=0){kind=item.s;break;}}
+      const amount=Math.max(3,Math.round(kind.value*(1+stage*.15)*rand(.77,1.15)*(.8+bot.skill*.15)));
+      bot.score+=amount;bot.catches++;bot.combo++;bot.lastCatch=gameClock;bot.lastFish=kind.name;
+      if(kind.value>=70&&Math.random()<.25) postChat(bot.name,choice([`哇，${kind.name}上钩了！`,`这条${kind.name}差点把竿拉断`,`谁能想到这里有${kind.name}`]));
+      else if(bot.combo>=3&&Math.random()<.10){postChat(bot.name,'连着三竿有鱼，今天这手感绝了');bot.combo=0;}
     }
     function updateBots(dt) {
-      botTick+=dt; chatTick+=dt;
-      if (botTick>=.25) {
-        botTick-=.25;
-        for (const bot of alive) {
-          if (bot.me) continue;
-          if (Math.random()<.025*bot.skill) botCatch(bot);
-        }
+      for(const bot of alive) {
+        if(bot.me)continue;
+        if(bot.quiet>0){bot.quiet-=dt;continue;}
+        bot.timer-=dt;
+        if(bot.timer>0)continue;
+        const desperate=timeLeft<16&&bot.score<=cutoffScore+5;
+        bot.timer=rand(7,14)*bot.style.rate/Math.pow(bot.skill,.40)*(desperate?.70:1);
+        if(Math.random()<bot.style.miss+(desperate?.1:0)){
+          bot.misses++;bot.combo=0;
+          if(bot.misses>=3&&Math.random()<.07)postChat(bot.name,'空了好几竿，我得换个钓点');
+        } else botCatch(bot);
+        if(Math.random()<.018)bot.quiet=rand(3,10); // Bathroom breaks and lost focus.
       }
-      if (chatTick>rand(5,7)) {
-        chatTick=0;
+      for(let i=pendingReplies.length-1;i>=0;i--){
+        const reply=pendingReplies[i];
+        if(gameClock>=reply.at){postChat(reply.name,reply.text);pendingReplies.splice(i,1);}
+      }
+      chatTick-=dt;
+      if(chatTick<=0){
+        chatTick=rand(6,12);
         const talkers=alive.filter(p=>!p.me);
-        if (talkers.length) postChat(choice(talkers).name,choice(['这水流也太快了吧','谁看到大鱼了？','马上淘汰了，紧张','我要攒鱼换新竿','这个鱼点有点东西','差点空军，呼','深水区有人试了吗','加油加油！']));
+        if(talkers.length){
+          const bot=choice(talkers);
+          const line=timeLeft<12?choice(['最后十秒，先稳住！','这名次要卡线了，拼一把','还差一条鱼就能进下一轮']):
+            bot.lastCatch>gameClock-8?choice([`刚收了一条${bot.lastFish}，漂亮`,`鱼口就在前面那片水里`,`这把想攒点鱼换装备`]):
+            choice(['这一片水流好急','你们能看出鱼游多快吗？','刚才空了一竿，下一竿肯定有','有人在追大鱼吗','前面那块水有鱼群','我再往下游丢一点试试']);
+          postChat(bot.name,line);
+        }
       }
     }
     function transitionRound() {
@@ -501,12 +578,12 @@
       ctx.fillStyle=glow;ctx.fillRect(0,0,W,H);
     }
     function drawFish(f,t) {
-      const k=f.kind, len=k.size*f.scale, wid=len*(k.shape==='ray'?.77:k.shape==='puffer'?.62:k.shape==='eel'?.20:.42);
+      const k=f.kind, len=k.size*f.scale, wid=len*(['ray','butterfly'].includes(k.shape)?.77:k.shape==='moon'?.82:k.shape==='puffer'?.62:['eel','dragon'].includes(k.shape)?.20:k.shape==='needle'?.18:.42);
       ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.sin(t*3+f.phase)*.045);
       const wag=Math.sin(t*9+f.phase)*Math.max(2,len*.10);
       ctx.fillStyle='rgba(3,25,37,.24)';ctx.beginPath();ctx.ellipse(6,8,wid*.7,len*.64,0,0,Math.PI*2);ctx.fill();
       ctx.fillStyle=k.color;ctx.strokeStyle='rgba(5,36,52,.65)';ctx.lineWidth=Math.max(1.3,len*.055);ctx.lineJoin='round';
-      if(k.shape==='eel'||k.shape==='leviathan') {
+      if(k.shape==='eel'||k.shape==='leviathan'||k.shape==='dragon') {
         ctx.beginPath();ctx.moveTo(wag,-len*.8);ctx.bezierCurveTo(-len*.24,-len*.27,len*.2,len*.12,0,len*.56);
         ctx.lineWidth=wid*1.45;ctx.lineCap='round';ctx.strokeStyle='rgba(5,30,40,.7)';ctx.stroke();
         ctx.lineWidth=wid*1.13;ctx.strokeStyle=k.color;ctx.stroke();
@@ -514,17 +591,41 @@
         ctx.fillStyle=k.color;ctx.beginPath();ctx.ellipse(0,len*.49,wid*.95,wid*.85,0,0,7);ctx.fill();
       } else {
         ctx.beginPath();ctx.moveTo(-wid*.2,-len*.36);ctx.lineTo(-wid*.8+wag,-len*.78);ctx.lineTo(wag,-len*.65);ctx.lineTo(wid*.8+wag,-len*.78);ctx.lineTo(wid*.2,-len*.36);ctx.fill();ctx.stroke();
-        if(k.shape==='ray') {
+        if(k.shape==='ray'||k.shape==='butterfly') {
           ctx.beginPath();ctx.moveTo(0,len*.53);ctx.quadraticCurveTo(-wid*.28,len*.2,-wid*1.2,-len*.06);ctx.quadraticCurveTo(-wid*.22,-len*.35,0,-len*.4);ctx.quadraticCurveTo(wid*.22,-len*.35,wid*1.2,-len*.06);ctx.quadraticCurveTo(wid*.28,len*.2,0,len*.53);ctx.fill();ctx.stroke();
           ctx.beginPath();ctx.moveTo(0,-len*.25);ctx.lineTo(wag*.5,-len*.94);ctx.stroke();
         } else {
-          if(k.shape==='shark') { ctx.beginPath();ctx.moveTo(0,-len*.33);ctx.lineTo(-wid*.95,-len*.23);ctx.lineTo(-wid*.38,-len*.08);ctx.closePath();ctx.fill();ctx.stroke(); }
-          ctx.beginPath();ctx.ellipse(0,0,wid*.67,len*.52,0,0,7);ctx.fill();ctx.stroke();
-          if(k.shape==='puffer'){for(let i=0;i<12;i++){const a=i*Math.PI/6;ctx.beginPath();ctx.moveTo(Math.cos(a)*wid*.60,Math.sin(a)*len*.48);ctx.lineTo(Math.cos(a)*wid*.87,Math.sin(a)*len*.7);ctx.strokeStyle='#ffe4a4';ctx.lineWidth=1.8;ctx.stroke();}}
+          if(['shark','sword','sturgeon'].includes(k.shape)) { ctx.beginPath();ctx.moveTo(0,-len*.33);ctx.lineTo(-wid*.95,-len*.23);ctx.lineTo(-wid*.38,-len*.08);ctx.closePath();ctx.fill();ctx.stroke(); }
+          ctx.beginPath();ctx.ellipse(0,0,k.shape==='moon'?wid*.88:wid*.67,k.shape==='moon'?len*.44:len*.52,0,0,7);ctx.fill();ctx.stroke();
+          if(k.shape==='puffer'||k.shape==='lion'){for(let i=0;i<(k.shape==='lion'?18:12);i++){const a=i*Math.PI/(k.shape==='lion'?9:6);ctx.beginPath();ctx.moveTo(Math.cos(a)*wid*.60,Math.sin(a)*len*.48);ctx.lineTo(Math.cos(a)*wid*(k.shape==='lion'?1.3:.87),Math.sin(a)*len*(k.shape==='lion'?.95:.7));ctx.strokeStyle=k.shape==='lion'?'#f8b28b':'#ffe4a4';ctx.lineWidth=k.shape==='lion'?2.5:1.8;ctx.stroke();}}
           else {ctx.beginPath();ctx.moveTo(-wid*.58,-len*.15);ctx.lineTo(-wid*1.0,-len*.20);ctx.lineTo(-wid*.52,len*.25);ctx.fill();ctx.beginPath();ctx.moveTo(wid*.58,-len*.15);ctx.lineTo(wid*1.0,-len*.20);ctx.lineTo(wid*.52,len*.25);ctx.fill();}
         }
       }
-      if(k.shape==='koi'||k.shape==='perch'||k.shape==='angler') {
+      if(k.shape==='needle'||k.shape==='sword') {
+        ctx.strokeStyle=k.shape==='sword'?'#e2b4cb':'#ecf4db';ctx.lineWidth=k.shape==='sword'?3:1.5;
+        ctx.beginPath();ctx.moveTo(0,len*.43);ctx.lineTo(0,len*(k.shape==='sword'?.91:.77));ctx.stroke();
+      }
+      if(k.shape==='catfish') {
+        ctx.strokeStyle='#d2d4bf';ctx.lineWidth=1.6;
+        for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(side*wid*.3,len*.31);ctx.quadraticCurveTo(side*wid*1.3,len*.22,side*wid*1.45,len*.61);ctx.stroke();}
+      }
+      if(k.shape==='moon') {
+        ctx.fillStyle='#f7c3a9';ctx.beginPath();ctx.moveTo(0,-len*.45);ctx.lineTo(-wid*.22,-len*.72);ctx.lineTo(wid*.23,-len*.45);ctx.fill();
+        ctx.beginPath();ctx.moveTo(0,len*.42);ctx.lineTo(-wid*.2,len*.66);ctx.lineTo(wid*.2,len*.41);ctx.fill();
+      }
+      if(k.shape==='sturgeon') {
+        ctx.fillStyle='#deeee4';
+        for(let i=0;i<4;i++){const y=-len*.31+i*len*.19;ctx.beginPath();ctx.moveTo(-wid*.38,y);ctx.lineTo(0,y+len*.075);ctx.lineTo(wid*.38,y);ctx.strokeStyle='rgba(239,250,224,.65)';ctx.lineWidth=2;ctx.stroke();}
+      }
+      if(k.shape==='butterfly') {
+        ctx.fillStyle='rgba(255,253,217,.72)';
+        for(const side of [-1,1]){ctx.beginPath();ctx.ellipse(side*wid*.57,-len*.09,wid*.24,len*.13,side*.45,0,7);ctx.fill();}
+      }
+      if(k.shape==='dragon') {
+        ctx.strokeStyle='rgba(241,202,255,.85)';ctx.lineWidth=2;
+        for(let i=0;i<4;i++){const y=-len*.35+i*len*.2;ctx.beginPath();ctx.moveTo(-wid*.3,y);ctx.lineTo(-wid*.95,y-len*.13);ctx.stroke();}
+      }
+      if(['koi','perch','angler','lion'].includes(k.shape)) {
         ctx.fillStyle=k.shape==='angler'?'rgba(235,161,255,.62)':'rgba(243,110,92,.62)';
         for(let i=0;i<3;i++){ctx.beginPath();ctx.ellipse((i%2?1:-1)*wid*.22,(-.21+i*.22)*len,wid*.18,len*.09,.4,0,7);ctx.fill();}
       }
@@ -661,6 +762,9 @@
       requestAnimationFrame(frame);
     }
 
+    screen.addEventListener('input',event=>{
+      if(event.target.id==='player-name'){save.name=event.target.value.trim().slice(0,12)||'岸边旅人';persist();}
+    });
     screen.addEventListener('click', event => {
       const buy=event.target.closest('[data-buy]');
       if(buy) {
@@ -682,8 +786,18 @@
     canvas.addEventListener('pointercancel',()=>{charge=null;});
     canvas.addEventListener('contextmenu',event=>event.preventDefault());
     function sendChat() {
-      const input=$('chat-input'),text=input.value.trim();if(!text)return;
-      postChat('你',text.slice(0,60));input.value='';input.blur();$('chat-box').classList.add('hidden');
+      const input=$('chat-input'),text=input.value.trim().slice(0,60);if(!text)return;
+      postChat(save.name,text);input.value='';input.blur();$('chat-box').classList.add('hidden');
+      $('feed').classList.add('visible');
+      if(activeGear.ui<2)setTimeout(()=>{if(mode==='playing'&&activeGear.ui<2)$('feed').classList.remove('visible');},11000);
+      const other=alive.filter(p=>!p.me);
+      if(other.length){
+        const bot=choice(other);
+        const answer=/大鱼|巨鱼|深/.test(text)?choice(['等鱼游到你落点附近再抛，别追着它点','我现在也拉不动大鱼，先攒点鱼换竿吧','往鱼前面一点点抛，水流很快']):
+          /装备|鱼竿|兑换/.test(text)?choice(['我在攒银尾鱼换青铜竿','商店得用对应的鱼换，金币只是积分','装备是下一局才生效，别买完在这局等']):
+          choice(['加油！这轮一起晋级','有道理，我试试','我刚刚也这么想','祝你这一竿出大货','你说得对，往下游预判更稳']);
+        pendingReplies.push({at:gameClock+rand(1.2,3.4),name:bot.name,text:answer});
+      }
       notify('已发送到本地模拟频道');
     }
     $('chat-send').addEventListener('click',sendChat);
