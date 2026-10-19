@@ -17,6 +17,10 @@
     #gear-frame { position:absolute; inset:12px; z-index:2; border:1px solid transparent; border-radius:12px; pointer-events:none; transition:border-color .5s,box-shadow .5s; }
     #gear-frame.tier-2 { border-color:rgba(135,239,209,.18); box-shadow:inset 0 0 50px rgba(87,223,194,.055); }
     #gear-frame.tier-3 { border-color:rgba(235,196,114,.42); box-shadow:inset 0 0 45px rgba(235,196,114,.09),0 0 23px rgba(235,196,114,.12); }
+    #gear-frame.tier-4 { inset:9px; border:2px solid rgba(255,224,162,.66); box-shadow:inset 0 0 75px rgba(124,164,236,.12),inset 0 0 4px #ffdd9f,0 0 25px rgba(255,216,137,.24); animation:royal-pulse 3s ease-in-out infinite alternate; }
+    #gear-frame.tier-4::before,#gear-frame.tier-4::after { content:'✧'; position:absolute; top:-13px; left:-9px; color:#ffe2a0; font-size:29px; text-shadow:0 0 14px #ffe2a0; }
+    #gear-frame.tier-4::after { left:auto; right:-9px; transform:scaleX(-1); }
+    @keyframes royal-pulse { to { border-color:rgba(255,226,169,.94); box-shadow:inset 0 0 86px rgba(124,164,236,.17),0 0 31px rgba(255,216,137,.4); } }
     #hud { position:absolute; inset:0; z-index:3; pointer-events:none; }
     .hidden { display:none!important; }
     .topbar { position:absolute; top:22px; left:28px; right:28px; display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
@@ -88,6 +92,9 @@
     .shop-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; max-height:min(52vh,480px); overflow:auto; padding-right:4px; scrollbar-color:#6c9c99 transparent; }
     .shop-card { padding:15px; border:1px solid rgba(169,225,215,.19); border-radius:11px; background:rgba(12,39,46,.76); }
     .shop-card.owned { border-color:rgba(136,230,187,.49); }
+    .shop-card.charm { background:linear-gradient(135deg,rgba(40,50,70,.9),rgba(12,39,46,.78)); }
+    .shop-card.equipped { border-color:rgba(236,197,130,.8); box-shadow:inset 0 0 24px rgba(236,197,130,.06); }
+    .shop-guide { padding:10px 12px; margin:0 0 12px; border:1px solid rgba(236,197,130,.23); border-radius:8px; background:rgba(236,197,130,.07); color:#e9d8b3; font-size:11px; line-height:1.65; }
     .rarity { margin-bottom:7px; color:#e8ba7e; font-size:10px; font-weight:900; letter-spacing:.2em; }
     .shop-card h3 { margin:0 0 5px; font-size:16px; }
     .shop-card p { min-height:36px; margin:0 0 10px; color:#a8bfba; font-size:11px; line-height:1.55; }
@@ -175,11 +182,16 @@
       { id:'leviathan', name:'渊流巨鱼', shape:'leviathan', size:115, value:260, need:10.0, tier:4, weight:4, speed:51, color:'#e7bc82' }
     ];
     const gear = [
-      { id:'reed', name:'芦苇短竿', rarity:'粗糙', desc:'一根能用的鱼竿。没有辅助界面，也拉不动大鱼。', power:2.1, ui:0, cost:{} },
-      { id:'bronze', name:'青铜逆流竿', rarity:'精良 · 力量', desc:'提升拉力，解锁常驻排行榜和基础瞄准环。', power:3.6, ui:1, cost:{silver:8,blue:4} },
-      { id:'tide', name:'逐潮探鱼仪', rarity:'稀有 · 感知', desc:'鱼口预判提示、河岸聊天窗与晶蓝外框。', power:5.5, ui:2, cost:{perch:7,carp:3,eel:2} },
-      { id:'abyss', name:'深渊牵星套装', rarity:'史诗 · 深渊', desc:'更强收线与金色豪华边框，终于可以挑战渊流巨鱼。', power:10.5, ui:3, cost:{puffer:5,ray:3,shark:2} },
-      { id:'crown', name:'潮汐王冠', rarity:'传说 · 统御', desc:'最终形态：最强拉力、稀有鱼辉光与王冠视觉。', power:14.0, ui:4, cost:{angler:3,leviathan:1,shark:3} }
+      { id:'reed', slot:'rod', school:'none', name:'芦苇短竿', rarity:'粗糙', desc:'勉强能用的鱼竿：只有最基础的计分界面。', power:2.1, ui:0, cost:{} },
+      { id:'bronze', slot:'rod', school:'power', name:'青铜逆流竿', rarity:'精良 · 力量流', desc:'基础拉力提升，解锁常驻排行与瞄准环。', power:3.6, ui:1, cost:{silver:8,blue:4} },
+      { id:'tide', slot:'rod', school:'flow', name:'逐潮感知竿', rarity:'稀有 · 感知流', desc:'更强拉力、提前量提示、聊天窗与晶蓝外框。', power:6.4, ui:2, cost:{perch:7,carp:3,eel:2} },
+      { id:'abyss', slot:'rod', school:'power', name:'深渊牵星竿', rarity:'史诗 · 深渊流', desc:'金色边框与强力收线，终于可以挑战渊流巨鱼。', power:10.5, ui:3, cost:{puffer:5,ray:3,shark:2} },
+      { id:'crown', slot:'rod', school:'flow', name:'潮汐王权竿', rarity:'传说 · 统御流', desc:'最终形态：最强拉力、稀有鱼辉光与王冠视觉。', power:14.0, ui:4, cost:{angler:3,leviathan:1,shark:3} },
+      { id:'ratchet', slot:'charm', school:'power', name:'鳍骨棘轮', rarity:'精良 · 连打流', desc:'收线按键更有力；搭配力量流鱼竿触发双件加成。', power:.2, tapBonus:.38, ui:1, cost:{silver:4,perch:2} },
+      { id:'sonarCharm', slot:'charm', school:'flow', name:'洄声探针', rarity:'稀有 · 预判流', desc:'提前解锁探鱼仪，延长抛投并增加新鱼出现率。', power:.25, castBonus:.18, rareBoost:.27, ui:2, cost:{blue:6,carp:3,eel:2} },
+      { id:'sinker', slot:'charm', school:'power', name:'稳潮坠', rarity:'稀有 · 稳定流', desc:'钓大鱼时张力增长更慢；可与力量流鱼竿共鸣。', power:.8, steady:.28, ui:1, cost:{catfish:4,puffer:2,carp:2} },
+      { id:'greedeye', slot:'charm', school:'flow', name:'贪婪鱼眼', rarity:'史诗 · 掠金流', desc:'每条鱼额外金币与高阶鱼机会，奖励更大但不增加耐力。', power:.3, goldBoost:1.24, rareBoost:.40, ui:2, cost:{moon:3,butterfly:2,ray:2} },
+      { id:'sigil', slot:'charm', school:'power', name:'王者徽记', rarity:'史诗 · 爆发流', desc:'更强拉力和连打，点亮豪华界面特效。', power:1.05, tapBonus:.65, ui:3, cost:{lion:3,angler:2,sword:1} }
     ];
     const botNames = ['晚风来信','鲤鱼跃电门','AquaX','钓到月亮','小河豚','NullPointer','咸鱼不翻身','鱼见愁','北岸七号','深蓝回声','阿岚','海盐汽水','鱼塘策士','旧码头','星尘钩手','团子同学','拾光','乌云背后','青柠薄荷','摸鱼专家','浪里白条','石桥客','流萤','白噪音','潮生','捞月人','竹影','阿瓦达大鱼','偏爱浅滩','海边的猫','极夜','鱼竿没电','青空','迴游','白鸥','下班就钓鱼','永远空军','深海来客'];
     const titles = ['见习钓手','岸边旅人','摸鱼大师','逆流猎人','蓝鳍传说','满载而归','空军指挥官','潮汐观测员','河道冠军','深水漫游者'];
@@ -204,13 +216,15 @@
     save=readSave();
 
     function readSave() {
-      const fresh={owned:['reed'],inventory:{},wins:0,runs:0,name:'岸边旅人',pid:`R${Math.floor(1000+Math.random()*9000)}`};
+      const fresh={owned:['reed'],equipped:null,inventory:{},wins:0,runs:0,name:'岸边旅人',pid:`R${Math.floor(1000+Math.random()*9000)}`};
       try {
         const parsed=JSON.parse(localStorage.getItem(SAVE_KEY));
         if(parsed&&Array.isArray(parsed.owned)&&parsed.inventory&&typeof parsed.inventory==='object') {
           const inventory={};
           for(const s of species) inventory[s.id]=clamp(Math.floor(Number(parsed.inventory[s.id])||0),0,99999);
-          return {owned:[...new Set(['reed',...parsed.owned.filter(id=>gear.some(g=>g.id===id))])],inventory,
+          const owned=[...new Set(['reed',...parsed.owned.filter(id=>gear.some(g=>g.id===id))])];
+          const equipped=owned.includes(parsed.equipped)&&gear.some(g=>g.id===parsed.equipped&&g.slot==='charm')?parsed.equipped:null;
+          return {owned,equipped,inventory,
             wins:clamp(Math.floor(Number(parsed.wins)||0),0,99999),runs:clamp(Math.floor(Number(parsed.runs)||0),0,99999),
             name:String(parsed.name||fresh.name).trim().slice(0,12)||fresh.name,
             pid:/^R\d{4}$/.test(parsed.pid)?parsed.pid:fresh.pid};
@@ -219,7 +233,16 @@
       return fresh;
     }
     function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) {} }
-    function bestGear() { return [...gear].reverse().find(g => save.owned.includes(g.id)) || gear[0]; }
+    function bestGear() { return [...gear].reverse().find(g=>g.slot==='rod'&&save.owned.includes(g.id))||gear[0]; }
+    function equippedCharm() { return gear.find(g=>g.id===save.equipped&&g.slot==='charm'&&save.owned.includes(g.id))||null; }
+    function buildLoadout() {
+      const rod=bestGear(),charm=equippedCharm(),setBonus=!!(charm&&rod.school===charm.school);
+      return {...rod,name:rod.name+(charm?` + ${charm.name}`:''),rodUi:rod.ui,charm:charm?.id||null,setBonus,
+        ui:Math.max(rod.ui,charm?.ui||0),power:rod.power+(charm?.power||0)+(setBonus?.35:0),
+        tapBonus:(charm?.tapBonus||0)+(setBonus?.13:0),steady:charm?.steady||0,
+        goldBoost:(charm?.goldBoost||1)*(setBonus?1.06:1),rareBoost:charm?.rareBoost||0,
+        castBonus:charm?.castBonus||0};
+    }
     function playerTitle() { return save.wins>0?'潮汐冠军':['见习钓手','逆流猎人','逐潮观测员','深渊领主','星海王者'][bestGear().ui]; }
     function resize() {
       const rect = app.getBoundingClientRect();
@@ -242,8 +265,9 @@
     }
     function rodTip() { return rodPose().tip; }
     function speciesWeight(s) {
-      if (s.tier>stage) return s.weight*.035; // A tantalising glimpse of tomorrow's fish.
-      return s.weight*(s.tier===stage?1+stage*.8:Math.max(.13,1-(stage-s.tier)*.32));
+      const lure=s.tier>0&&s.tier>=stage?1+(activeGear.rareBoost||0)*2:1;
+      if(s.tier>stage)return s.weight*.035*lure; // A glimpse of tomorrow's fish.
+      return s.weight*(s.tier===stage?1+stage*.8:Math.max(.13,1-(stage-s.tier)*.32))*lure;
     }
     function pickSpecies() {
       const pool=species.filter(s=>s.tier<=Math.min(stage+1,4));
@@ -279,19 +303,22 @@
         <div class="profile-setup"><label>参赛昵称 <input id="player-name" maxlength="12" value="${esc(save.name)}" aria-label="参赛昵称"></label><span>${esc(playerTitle())} · ID ${esc(save.pid)}</span></div>
         <div class="actions"><button class="btn primary" data-action="start">开始游戏 ↗</button><button class="btn" data-action="shop">鱼仓与装备</button></div>
         <div class="rules"><span class="rule">① 左键按住蓄力，松开抛竿</span><span class="rule">② 空格连按收线，R 放生</span><span class="rule">③ Tab 查看排名 · Enter 发言</span></div>
-        <p class="footnote">离线可玩 · 99 名对手为本地模拟角色，并非联网真人 · 装备仅使用鱼购买，下一局生效<br>当前装备：${esc(bestGear().name)} · 累计游玩 ${save.runs} 局 · 胜利 ${save.wins} 次</p>`;
+        <p class="footnote">离线可玩 · 99 名对手为本地模拟角色，并非联网真人 · 装备仅使用鱼购买，下一局生效<br>下一局装备：${esc(buildLoadout().name)}${buildLoadout().setBonus?' · 流派共鸣激活':''} · 累计 ${save.runs} 局 · 胜利 ${save.wins} 次</p>`;
     }
 
     function renderShop() {
       mode='shop'; $('hud').classList.add('hidden'); screen.classList.remove('hidden');
-      const inventory = species.filter(s => (save.inventory[s.id]||0)>0).map(s => `${esc(s.name)} × ${Math.max(0,Math.floor(save.inventory[s.id]))}`).join('　·　') || '鱼仓空空，先来一局吧。';
-      const cards = gear.slice(1).map(g => {
-        const owned=save.owned.includes(g.id);
-        const cost=Object.entries(g.cost).map(([id,count]) => `${esc(species.find(s=>s.id===id).name)} ${count} (${Math.max(0,Math.floor(save.inventory[id]||0))})`).join(' · ');
-        const affordable=Object.entries(g.cost).every(([id,count]) => (save.inventory[id]||0)>=count);
-        return `<article class="shop-card ${owned?'owned':''}"><div class="rarity">${esc(g.rarity)}</div><h3>${esc(g.name)}</h3><p>${esc(g.desc)}</p><div class="cost">所需：${cost}</div><button class="btn ${affordable&&!owned?'primary':''}" data-buy="${g.id}" ${owned||!affordable?'disabled':''}>${owned?'已拥有':affordable?'用鱼兑换 · 下一局生效':'鱼种不足'}</button></article>`;
+      const inventory=species.filter(s=>(save.inventory[s.id]||0)>0).map(s=>`${esc(s.name)} × ${Math.max(0,Math.floor(save.inventory[s.id]))}`).join('　·　')||'鱼仓空空，先来一局吧。';
+      const next=buildLoadout();
+      const cards=gear.filter(g=>g.id!=='reed').map(g=>{
+        const owned=save.owned.includes(g.id),worn=save.equipped===g.id;
+        const cost=Object.entries(g.cost).map(([id,count])=>`${esc(species.find(s=>s.id===id).name)} ${count} (${Math.max(0,Math.floor(save.inventory[id]||0))})`).join(' · ');
+        const affordable=Object.entries(g.cost).every(([id,count])=>(save.inventory[id]||0)>=count);
+        const button=owned?(g.slot==='charm'?`<button class="btn ${worn?'primary':''}" data-equip="${g.id}">${worn?'正在佩戴 · 点击卸下':'佩戴此配件 · 下一局生效'}</button>`:'<button class="btn" disabled>已拥有 · 自动使用最高阶鱼竿</button>'):
+          `<button class="btn ${affordable?'primary':''}" data-buy="${g.id}" ${affordable?'':'disabled'}>${affordable?'用鱼兑换 · 下一局生效':'鱼种不足'}</button>`;
+        return `<article class="shop-card ${owned?'owned':''} ${g.slot==='charm'?'charm':''} ${worn?'equipped':''}"><div class="rarity">${g.slot==='rod'?'◆ 鱼竿':'✦ 流派配件'} · ${esc(g.rarity)}</div><h3>${esc(g.name)}</h3><p>${esc(g.desc)}</p><div class="cost">所需：${cost}</div>${button}</article>`;
       }).join('');
-      screenContent.innerHTML=`<div class="eyebrow">RIVER EXCHANGE · 战利品商店</div><div class="shop-head"><h2>鱼仓与装备</h2><button class="btn" data-action="menu">返回</button></div><div class="inventory">鱼仓：${inventory}</div><div class="shop-grid">${cards}</div><p class="footnote">所有装备只消耗指定鱼种；金币只计算本局排行榜分数。购买装备从下一局开始生效。装备越好，界面越丰富。</p>`;
+      screenContent.innerHTML=`<div class="eyebrow">RIVER EXCHANGE · 战利品商店</div><div class="shop-head"><h2>鱼仓与装备</h2><button class="btn" data-action="menu">返回</button></div><div class="shop-guide">下一局配装：${esc(next.name)} · 拉力 ${next.power.toFixed(2)}${next.setBonus?' · ✦ 同流派两件共鸣：拉力、收线和金币提升':''}<br>鱼竿自动采用最高阶；流派配件可购买多件、一次佩戴一件。所有变动从<strong>下一局</strong>生效。</div><div class="inventory">鱼仓：${inventory}</div><div class="shop-grid">${cards}</div><p class="footnote">装备只消耗指定鱼种，不消耗金币；金币仅作本局排行榜分数。稀有度、流派、套装共鸣都会改变能力与画面。</p>`;
     }
 
     function makeBots() {
@@ -316,12 +343,12 @@
     function startGame() {
       const nameInput=$('player-name');
       if(nameInput){save.name=nameInput.value.trim().slice(0,12)||'岸边旅人';persist();}
-      activeGear=bestGear(); mode='playing'; stage=0; timeLeft=ROUND_TIME; gameClock=0; gold=0; rank=100; playerAlive=true;
+      activeGear=buildLoadout(); mode='playing'; stage=0; timeLeft=ROUND_TIME; gameClock=0; gold=0; rank=100; playerAlive=true;
       bots=makeBots(); alive=[{id:0,name:save.name,title:playerTitle(),pid:save.pid,score:0,me:true},...bots];
       haul={}; cast=null; hooked=null; charge=null; forceBoard=false; botTick=0; hudTick=0; chatTick=rand(5,9); pendingReplies=[];
       $('profile-label').textContent=`${save.name} · ${playerTitle()} · ID ${save.pid} · 离线模拟赛`;
       $('hud').classList.remove('hidden'); screen.classList.add('hidden'); $('fight').classList.add('hidden'); $('chat-box').classList.add('hidden');
-      $('gear-frame').className=activeGear.ui>=3?'tier-3':activeGear.ui>=2?'tier-2':'';
+      $('gear-frame').className=activeGear.ui>=4?'tier-4':activeGear.ui>=3?'tier-3':activeGear.ui>=2?'tier-2':'';
       $('feed').classList.toggle('visible',activeGear.ui>=2);
       $('sonar').classList.toggle('hidden',activeGear.ui<2);
       $('board').classList.toggle('visible',activeGear.ui>=1);
@@ -442,7 +469,7 @@
 
     function castTarget(power) {
       const base=rodBase(), dx=pointer.x-base.x, dy=pointer.y-base.y, d=Math.max(1,Math.hypot(dx,dy));
-      const reach=75+power*Math.min(W*.83,750);
+      const reach=75+power*Math.min(W*.83,750)*(1+(activeGear.castBonus||0));
       let x=base.x+dx/d*reach, y=base.y+dy/d*reach;
       y=clamp(y,50,H-42); x=clamp(x,riverLeft(y)+26,riverRight(y)-26);
       return {x,y};
@@ -470,16 +497,16 @@
       if(mode!=='playing'||!hooked) return;
       const {fish:f}=hooked;
       if (activeGear.power < f.kind.need) { notify('当前鱼竿拉力不足！按 R 放生，换强力装备再试'); return; }
-      const effectiveness=activeGear.power/(f.kind.need+.8);
-      hooked.progress+=clamp(10.2*effectiveness,4.5,19);
-      hooked.tension=clamp(hooked.tension-.067,0,1);
+      const effectiveness=activeGear.power/(f.kind.need+.8)*(1+(activeGear.tapBonus||0));
+      hooked.progress+=clamp(10.2*effectiveness,4.5,23);
+      hooked.tension=clamp(hooked.tension-.067-(activeGear.steady||0)*.10,0,1);
       hooked.taps++;
       if (hooked.progress>=100) catchFish();
     }
     function catchFish() {
       if (!hooked) return;
       const kind=hooked.fish.kind;
-      const earned=Math.round(kind.value*(1+stage*.15)*rand(.86,1.17));
+      const earned=Math.round(kind.value*(1+stage*.15)*rand(.86,1.17)*(activeGear.goldBoost||1));
       gold+=earned; alive.find(p=>p.me).score=gold;
       haul[kind.id]=(haul[kind.id]||0)+1;
       hooked=null; cast=null; $('fight').classList.add('hidden');
@@ -514,7 +541,7 @@
       }
       if(hooked) {
         hooked.age+=dt;
-        hooked.tension+=dt*(.056+hooked.fish.kind.need*.009);
+        hooked.tension+=dt*(.056+hooked.fish.kind.need*.009)*(1-(activeGear.steady||0));
         hooked.progress=Math.max(0,hooked.progress-dt*(1+hooked.fish.kind.need*.38));
         hooked.fish.y+=dt*25;
         $('progress-fill').style.width=`${clamp(hooked.progress,0,100)}%`;
@@ -661,9 +688,15 @@
                   z:c.z+(normal.z*Math.cos(a)+second.z*Math.sin(a))*r};
         });
       };
+      const quality=activeGear.rodUi||0;
       const cork=['#956644','#bf925f','#e9c89a','#f6d6a1','#c69a6c','#795239','#6f4935','#a16c47'];
-      const graphite=['#174b53','#358a86','#7cc5b1','#c0e6c0','#3c9188','#164951','#0e323f','#163a46'];
-      const metal=['#775e4e','#c3945c','#f5d499','#ffe4b5','#c69865','#806354','#58494b','#a67959'];
+      const graphite=quality===0?['#324b48','#668474','#adbc92','#cfca96','#78846c','#3a554b','#233e3b','#526a55']:
+        quality===1?['#4b5760','#8d9b9b','#c1dbcf','#f2e4b7','#8ea99e','#536e75','#34565e','#587980']:
+        quality===2?['#164c60','#478fb4','#8cdaef','#c4f4ec','#56b5bc','#205779','#113e61','#2e7190']:
+        quality===3?['#2b315d','#65539b','#c7a7e9','#f1d7aa','#8a68b1','#493c77','#252b52','#615382']:
+        ['#353b75','#8578b0','#f6d9a0','#fff2bf','#cba583','#645a9d','#282e60','#927ba1'];
+      const metal=quality>=3?['#655545','#af8550','#ffe2a0','#fff3c9','#dfbc73','#8a6b51','#524344','#bb9158']:
+        ['#775e4e','#c3945c','#f5d499','#ffe4b5','#c69865','#806354','#58494b','#a67959'];
       const faces=[];
       for(let i=0;i<24;i++){
         const u=i/24,v=(i+1)/24,a=ring(u),b=ring(v);
@@ -707,6 +740,14 @@
       ctx.fillStyle='#f4d39b';ctx.beginPath();ctx.arc(front.x,front.y,r*.18,0,Math.PI*2);ctx.fill();
       ctx.strokeStyle='#e6c187';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(front.x,front.y);ctx.lineTo(front.x-r*.62,front.y+r*.83);ctx.lineTo(front.x-r*.36,front.y+r*1.04);ctx.stroke();
       ctx.fillStyle='#313f42';ctx.beginPath();ctx.ellipse(front.x-r*.36,front.y+r*1.04,r*.24,r*.15,.55,0,Math.PI*2);ctx.fill();
+      if(activeGear.ui>=2){
+        const tip=project(spine(.98));
+        ctx.globalAlpha=.42+Math.sin(t*3)*.14;
+        ctx.shadowBlur=activeGear.ui>=4?22:13;ctx.shadowColor=activeGear.ui>=3?'#ffd99e':'#a4f7f3';
+        ctx.fillStyle=activeGear.ui>=3?'#ffe4ad':'#aaf6ec';ctx.beginPath();ctx.arc(tip.x,tip.y,activeGear.ui>=4?6:3.7,0,Math.PI*2);ctx.fill();
+        if(activeGear.setBonus){ctx.lineWidth=1.2;ctx.strokeStyle=activeGear.school==='power'?'#f4cfa3':'#a8f4ea';ctx.beginPath();ctx.arc(front.x,front.y,r*1.3+Math.sin(t*3)*2,0,Math.PI*2);ctx.stroke();}
+        ctx.shadowBlur=0;ctx.globalAlpha=1;
+      }
       ctx.restore();
     }
     function drawFishing(t) {
@@ -766,12 +807,20 @@
       if(event.target.id==='player-name'){save.name=event.target.value.trim().slice(0,12)||'岸边旅人';persist();}
     });
     screen.addEventListener('click', event => {
+      const equip=event.target.closest('[data-equip]');
+      if(equip){
+        const item=gear.find(g=>g.id===equip.dataset.equip&&g.slot==='charm');
+        if(!item||!save.owned.includes(item.id))return;
+        save.equipped=save.equipped===item.id?null:item.id;
+        persist();renderShop();notify(`${save.equipped?'已佩戴':'已卸下'}：${item.name} · 下一局生效`);return;
+      }
       const buy=event.target.closest('[data-buy]');
       if(buy) {
         const item=gear.find(g=>g.id===buy.dataset.buy);
         if(!item||save.owned.includes(item.id)||!Object.entries(item.cost).every(([id,n])=>(save.inventory[id]||0)>=n))return;
         for(const [id,n] of Object.entries(item.cost)) save.inventory[id]-=n;
-        save.owned.push(item.id);persist();renderShop();notify(`兑换成功：${item.name} · 下一局生效`);return;
+        save.owned.push(item.id);if(item.slot==='charm')save.equipped=item.id;
+        persist();renderShop();notify(`兑换成功：${item.name} · 下一局生效`);return;
       }
       const action=event.target.closest('[data-action]')?.dataset.action;
       if(action==='start')startGame();else if(action==='shop')renderShop();else if(action==='menu')renderMenu();else if(action==='chest')openChest();
