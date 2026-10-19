@@ -1,0 +1,17 @@
+{
+  "name": "deep-current-3d",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline single-file isometric WebGL fishing tournament",
+  "scripts": {
+    "build:preview": "node build.mjs",
+    "build:main": "node build.mjs --index"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
