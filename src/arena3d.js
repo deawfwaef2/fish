@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World3D } from './scene3d.js';
 import { ROUND_SECONDS, STAGES, FISH, GEAR, NAMES, TITLES } from './data.js';
+import { initBot, placeBot, tickBots, tickChat, say, replyLine, onWaveWarning, onWaveHit } from './bots.js';
 
 const $=id=>document.getElementById(id);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -11,12 +12,17 @@ const safe=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;
 const SAVE_KEY='deep-current-save-v1'; // Compatible with the earlier standalone game.
 const FISH_BY_ID=new Map(FISH.map(f=>[f.id,f]));
 const GEAR_BY_ID=new Map(GEAR.map(g=>[g.id,g]));
+// Big fish that can churn the water and stun people standing on the bank.
+const WAVE_SOURCES={catfish:{kind:'thrash',stun:.9},eel:{kind:'shock',stun:1.5},shark:{kind:'thrash',stun:1.8},sword:{kind:'leap',stun:1.7},dragon:{kind:'surge',stun:2.2},leviathan:{kind:'surge',stun:2.8}};
+const WAVE_KIND_NAME={thrash:'甩尾浪',shock:'电涌',leap:'跃水冲击',surge:'暴涌'};
+const WAVE_GAP=[[19,25],[16,22],[13,18],[11,15],[9,12]];
 
 class Game {
   constructor(){
     this.mode='menu';this.stage=0;this.timeLeft=ROUND_SECONDS;
     this.elapsed=0;this.clock=0;this.gold=0;this.rank=100;
     this.bots=[];this.alive=[];this.fish=[];this.haul={};
+    this.pendingChat=[];this.chatCooldown=0;this.wave=null;this.waveNext=0;this.stunUntil=0;this.waveCount=0;
     this.cast=null;this.charge=null;this.hooked=null;this.aimPoint=null;
     this.player={x:10,z:0,walking:false};this.keys=new Set();
     this.joystick={x:0,y:0};this.boardOpen=false;
@@ -75,6 +81,7 @@ class Game {
       $('fight').classList.add('hidden');$('charge').classList.add('hidden');$('chat-entry').classList.add('hidden');
       $('full-board').classList.add('hidden');this.boardOpen=false;this.keys.clear();
       this.world.showLine(null);this.world.showAim(null,0,0);this.world.showPull(null,0);
+      this.wave=null;this.stunUntil=0;this.world.showWave(null);$('dizzy').classList.add('hidden');$('wave-warn').classList.add('hidden');
     }
   }
   renderMenu(){
@@ -82,7 +89,7 @@ class Game {
     $('menu-content').innerHTML=`<div class="menu-kicker">RIVER ROYALE · 离线单机 3D 淘汰赛</div>
       <h1 class="menu-title">深<em>流</em><small>DEEP CURRENT / BREAK THE CURRENT</small></h1>
       <div class="menu-line"></div>
-      <p class="menu-intro">在白浪间穿行。与河岸上的 99 名本地模拟钓手争夺鱼群。<br>每轮 60 秒、每轮淘汰一半；坚持到星渊决战，争取第一名与神秘宝箱。</p>
+      <p class="menu-intro">在白浪间穿行。与河岸上的 99 名本地模拟钓手争夺鱼群。部分大鱼会掀起电涌，击中岸边的人并造成眩晕，狂按空格可以缓解。<br>每轮 60 秒、每轮淘汰一半；坚持到星渊决战，争取第一名与神秘宝箱。</p>
       <div class="profile"><label for="player-name">参赛昵称</label><input id="player-name" maxlength="12" value="${safe(this.save.name)}"><span>${safe(this.title())} · ID ${safe(this.save.pid)}</span></div>
       <div class="menu-actions"><button class="btn primary" data-action="start">进入 3D 河道 ↗</button><button class="btn" data-action="shop">鱼仓与装备</button></div>
       <div class="menu-controls"><span>W A S D / 手机摇杆移动</span><span>河面长按蓄力 / 松开抛竿</span><span>空格 / 手机按钮收线 · R 放生</span><span>Tab 排行 · Enter 聊天</span></div>
@@ -124,8 +131,8 @@ class Game {
         if(!used.has(candidate)){name=candidate;break;}
       }
       if(!name)name=`河岸钓手${i+1}`;used.add(name);
-      return {id:i+1,name,title:choice(TITLES),score:0,alive:true,skill:rand(.65,1.45),risk:Math.random(),
-        pace:rand(5.8,12.5),timer:rand(2.5,13),catches:0,lastCatch:-100,dialogue:'',dialogueUntil:0};
+      const bot={id:i+1,name,title:choice(TITLES),score:0,alive:true,catches:0,lastCatch:-100};
+      initBot(bot);return bot;
     });
   }
   start(){
@@ -136,6 +143,7 @@ class Game {
     this.bots=this.makeBots();this.world.setBots(this.bots);
     this.me={id:0,name:this.save.name,title:this.title(),score:0,me:true,alive:true};
     this.alive=[this.me,...this.bots];this.botChatTimer=rand(5,9);this.hudTimer=0;this.labelTimer=0;
+    this.pendingChat=[];this.chatCooldown=0;this.wave=null;this.stunUntil=0;this.waveNext=this.clock+13;this.waveCount=0;this.world.showWave(null);
     this.clearFish();for(let i=0;i<this.fishCapacity(true);i++)this.fish.push(this.newFish(true));
     this.world.applyStage(0);document.body.dataset.ui=String(this.active.ui);
     $('identity').textContent=`${this.save.name} · ${this.title()} · ID ${this.save.pid} · 本地模拟赛`;
@@ -213,37 +221,10 @@ class Game {
   sendChat(){
     const input=$('chat-text'),text=input.value.trim();if(!text)return;
     this.postChat(this.save.name,text.slice(0,60));input.value='';$('chat-entry').classList.add('hidden');input.blur();
-    const bot=choice(this.alive.filter(p=>!p.me));if(bot){
-      bot.dialogue=choice(['这水流真的太快了！','试试往鱼群下游抛。','看到你了，我就在桥旁。','这轮一定要晋级！']);
-      bot.dialogueUntil=this.clock+4;
-    }
+    const bot=choice(this.alive.filter(p=>!p.me));if(bot)say(this,bot,replyLine(),rand(.6,2.2));
   }
   updateBots(dt){
-    for(const bot of this.alive){
-      if(bot.me)continue;
-      bot.timer-=dt;
-      if(bot.timer>0)continue;
-      const speedUp=this.timeLeft<12&&bot.score<(this.sortPlayers()[Math.ceil(this.alive.length/2)-1]?.score||0);
-      bot.timer=bot.pace*(speedUp?.68:1)*rand(.75,1.35)/Math.pow(bot.skill,.45);
-      if(Math.random()<.15+bot.risk*.11)continue;
-      const pool=FISH.filter(k=>k.tier<=this.stage&&k.power<=2.3+bot.skill*.65+this.stage*1.77);
-      if(!pool.length)continue;
-      const sum=pool.reduce((n,k)=>n+this.fishWeight(k),0);let roll=Math.random()*sum,kind=pool[0];
-      for(const k of pool){roll-=this.fishWeight(k);if(roll<=0){kind=k;break;}}
-      const score=Math.max(3,Math.round(kind.value*(1+this.stage*.14)*rand(.72,1.16)*(.78+bot.skill*.22)));
-      bot.score+=score;bot.catches++;bot.lastCatch=this.clock;
-      if(Math.random()<.19){bot.dialogue=`钓到${kind.name}！`;bot.dialogueUntil=this.clock+3.5;}
-      if(kind.value>=70&&Math.random()<.12)this.postChat(bot.name,`刚收了条${kind.name}，惊险！`);
-    }
-    this.botChatTimer-=dt;
-    if(this.botChatTimer<=0){
-      this.botChatTimer=rand(6,12);
-      const bot=choice(this.alive.filter(p=>!p.me));if(bot){
-        const line=this.timeLeft<12?choice(['最后十秒！','我这分数有点悬','还能再抛一竿！']):
-          choice(['这白浪里有大鱼吗？','我再往下游走两步','这一片急流太刺激了','往鱼前面抛，试试提前量','刚才空了一竿！']);
-        bot.dialogue=line;bot.dialogueUntil=this.clock+3;this.postChat(bot.name,line);
-      }
-    }
+    tickBots(this,dt);tickChat(this,dt);
   }
   moveSurvivorsCloser(){
     // After a cut, the remaining physical anglers gather near the next arena.
@@ -267,6 +248,8 @@ class Game {
     for(const b of this.bots)b.alive=survivors.has(b);
     this.stage++;this.timeLeft=ROUND_SECONDS;this.cast=null;this.charge=null;
     this.moveSurvivorsCloser();
+    for(const b of this.bots)if(b.alive)placeBot(b);
+    this.wave=null;this.stunUntil=0;this.world.showWave(null);this.waveNext=this.clock+12;this.chatCooldown=0;
     if(this.hooked){this.hooked.fish.hooked=false;this.hooked=null;}
     $('fight').classList.add('hidden');$('charge').classList.add('hidden');
     this.clearFish();for(let i=0;i<this.fishCapacity();i++)this.fish.push(this.newFish(true));
@@ -302,6 +285,55 @@ class Game {
     this.save.inventory[kind]=(this.save.inventory[kind]||0)+1;this.persist();this.renderResult();
     this.notify(`宝箱奖励：${FISH_BY_ID.get(kind).name} × 1，已入鱼仓！`);
   }
+  stunned(){return this.clock<this.stunUntil;}
+  mash(){
+    if(!this.stunned())return;
+    this.stunUntil-=.11;
+    if(!this.stunned())this.notify('缓过来了！');
+  }
+  stunPlayer(duration){
+    if(this.mode!=='playing')return;
+    const was=this.stunned();
+    this.stunUntil=Math.max(this.stunUntil,this.clock+duration);
+    if(was)return;
+    const lostFish=!!this.hooked;
+    this.cancelCast(null);this.charge=null;$('charge').classList.add('hidden');
+    this.world.shake=Math.max(this.world.shake,.9);
+    this.hint(lostFish?'眩晕！鱼脱钩了 · <strong>狂按空格</strong> 缓解晕眩':'眩晕中，无法抛竿或收线 · <strong>狂按空格</strong> 缓解晕眩');
+  }
+  updateStunUI(){
+    const on=this.stunned();
+    $('dizzy').classList.toggle('hidden',!on);$('app').classList.toggle('dizzy-screen',on);
+    if(on)$('dizzy-text').textContent=`眩晕 ${Math.max(0,this.stunUntil-this.clock).toFixed(1)}s · 狂按空格缓解`;
+  }
+  spawnWave(){
+    const now=this.clock;
+    const candidates=this.fish.filter(f=>!f.hooked&&WAVE_SOURCES[f.kind.id]&&Math.abs(f.z-this.player.z)<36);
+    if(!candidates.length){this.waveNext=now+1.5;return;}
+    const f=choice(candidates),src=WAVE_SOURCES[f.kind.id],stage=this.stage;
+    const warn=stage>=3?1.1:1.35;
+    this.wave={phase:'warn',x:f.x,z:f.z,name:f.kind.name,kind:src.kind,stun:src.stun*(1+stage*.1),startAt:now,hitAt:now+warn,endAt:now+warn+1.5};
+    const gap=WAVE_GAP[stage];this.waveNext=now+rand(gap[0],gap[1]);this.waveCount++;
+    onWaveWarning(this,this.wave);
+    this.notify(`⚠ ${f.kind.name} 正在掀起${WAVE_KIND_NAME[src.kind]}！离开它的水域 ±6 米即可躲开`);
+  }
+  applyWave(w){
+    const hitBots=onWaveHit(this,w);
+    this.world.shake=Math.max(this.world.shake,1.1);
+    if(Math.abs(this.player.z-w.z)<=6.5)this.stunPlayer(w.stun*rand(.9,1.15));
+    else this.notify('你躲开了电涌！');
+    this.postChat('系统',`${w.name}冲击岸边，${hitBots} 位钓手受到影响。`);
+  }
+  updateWaves(){
+    const now=this.clock;
+    if(!this.wave){if(now>=this.waveNext)this.spawnWave();return;}
+    const w=this.wave;
+    if(w.phase==='warn'&&now>=w.hitAt){w.phase='hit';this.applyWave(w);}
+    if(now>=w.endAt){this.wave=null;this.world.showWave(null);$('wave-warn').classList.add('hidden');return;}
+    this.world.showWave(w,now);
+    const warn=$('wave-warn');warn.classList.toggle('hidden',w.phase!=='warn');
+    if(w.phase==='warn')warn.textContent=`⚠ ${w.name}即将冲击岸边 ${Math.max(0,w.hitAt-now).toFixed(1)}s · 远离它的水域 ±6 米可躲开`;
+  }
   targetFor(aim,power){
     const from=new THREE.Vector3(this.player.x,0,this.player.z);
     const delta=aim.clone().sub(from);delta.y=0;
@@ -312,7 +344,7 @@ class Game {
     return out;
   }
   beginCharge(event){
-    if(this.mode!=='playing'||this.boardOpen||this.charge||this.cast||this.hooked)return;
+    if(this.mode!=='playing'||this.boardOpen||this.charge||this.cast||this.hooked||this.stunned())return;
     const point=this.world.onWater(event.clientX,event.clientY);if(!point)return;
     this.charge={since:performance.now(),power:0,point};$('charge').classList.remove('hidden');
     try{$('scene').setPointerCapture(event.pointerId);}catch(_){/* browser may lack capture */}
@@ -341,7 +373,9 @@ class Game {
     this.hint(this.active.power<f.kind.power?'这条鱼太大了！按 <strong>R 放生</strong>，升级鱼竿再挑战':'鱼上钩了！快速按 <strong>空格</strong> 收线 · R 放生');
   }
   reel(){
-    if(this.mode!=='playing'||!this.hooked)return;
+    if(this.mode!=='playing')return;
+    if(this.stunned()){this.mash();return;}
+    if(!this.hooked)return;
     const h=this.hooked,f=h.fish;
     if(this.active.power<f.kind.power){this.notify('当前鱼竿拉力不足，按 R 放生并升级装备');return;}
     const effectiveness=this.active.power/(f.kind.power+.85)*(1+this.active.tap);
@@ -418,6 +452,7 @@ class Game {
     }
   }
   movePlayer(dt){
+    if(this.stunned()){this.player.walking=false;return;}
     let x=(this.keys.has('KeyD')?1:0)-(this.keys.has('KeyA')?1:0)+this.joystick.x;
     let z=(this.keys.has('KeyS')?1:0)-(this.keys.has('KeyW')?1:0)+this.joystick.y;
     const length=Math.hypot(x,z);if(length>1){x/=length;z/=length;}
@@ -518,15 +553,16 @@ class Game {
     const dt=Math.min(.18,wall);this.lastFrame=timestamp;this.clock+=wall;
     if(this.mode==='playing'){
       this.timeLeft=Math.max(0,this.timeLeft-wall);this.elapsed+=wall;
-      this.movePlayer(dt);this.updateBots(wall);this.updateFish(dt);this.updateFishing(wall);
+      this.updateWaves();this.movePlayer(dt);this.updateBots(wall);this.updateFish(dt);this.updateFishing(wall);this.updateStunUI();
       this.hudTimer-=dt;this.labelTimer-=dt;
       if(this.hudTimer<=0){this.hudTimer=.4;this.updateHUD();}
       if(this.timeLeft<=0)this.nextRound();
     }else if(this.mode==='menu'||this.mode==='shop')this.updateFish(dt);
+    this.world.playerStunned=this.mode==='playing'&&this.stunned();
     this.world.setPlayerPosition(this.player.x,this.player.z,this.player.walking&&this.mode==='playing',this.clock,dt);
     this.world.updateCamera(this.player.x,this.player.z,dt);
     this.world.updateFlow(this.clock,dt,this.player.z);
-    this.world.updatePeople(this.clock,this.player.z);
+    this.world.updatePeople(this.clock,this.player.z,wall);
     const target=this.charge?this.targetFor(this.charge.point,this.charge.power):this.mode==='playing'&&!this.cast&&!this.hooked&&this.active.ui>0&&this.aimPoint?this.aimPoint:null;
     this.world.showAim(this.mode==='playing'?target:null,this.charge?.power||0,this.clock);
     const hook=this.hooked?.fish||null;
@@ -542,7 +578,7 @@ class Game {
 window.addEventListener('DOMContentLoaded',()=>{
   const game=new Game();
   // Manual QA helpers exist only when the URL explicitly opts into testing.
-  if(location.search.includes('qa=1'))window.__deepCurrentQA={game,advance(seconds){
+  if(location.search.includes('qa=1'))window.__deepCurrentQA={game,forceWave(){if(game.mode==='playing')game.waveNext=game.clock;},stats(){const counts={};for(const b of game.bots)if(b.alive)counts[b.state]=(counts[b.state]||0)+1;return {counts,waves:game.waveCount,stunned:game.stunned(),catches:game.bots.reduce((n,b)=>n+b.catches,0),pending:game.pendingChat.length};},advance(seconds){
     if(game.mode!=='playing')return;
     game.timeLeft=Math.max(0,game.timeLeft-seconds);
     if(game.timeLeft===0)game.nextRound();game.updateHUD();

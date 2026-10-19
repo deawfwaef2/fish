@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { placeBot } from './bots.js';
 import { STAGES } from './data.js';
 
 const V = (x,y,z) => new THREE.Vector3(x,y,z);
@@ -84,6 +85,8 @@ export class World3D {
     this.makeBiomes();
     this.makeCharacters();
     this.makeCastVisuals();
+    this.makeWaveVisuals();
+    this.shake=0;this.playerStunned=false;
     this.fishMats=new Map();
     this.fishPools=new Map(); // One set of GPU instances per species; every fish stays hookable.
     this.fishMatrix=new THREE.Matrix4();this.fishRoot=new THREE.Object3D();this.fishPart=new THREE.Object3D();
@@ -363,7 +366,7 @@ export class World3D {
       b.x=side*(9.15+(i%4)*.79);b.z=row*3.12+(seed(i+25)-.5)*1.25;
       // Keep the starting pier for the player: nearby rivals remain on both banks.
       if(side===1&&Math.abs(b.z)<8)b.z+=b.z<0?-9:9;
-      b.side=side;b.seed=seed(i*3+12)*6.28;b.color=palette[i%palette.length];
+      b.side=side;b.seed=seed(i*3+12)*6.28;if(b.color===undefined)b.color=palette[i%palette.length];placeBot(b);
       this.people.torso.setColorAt(i,new THREE.Color(b.color));
       this.people.arm.setColorAt(i,new THREE.Color(b.color));
       this.people.hat.setColorAt(i,new THREE.Color(palette[(i+3)%palette.length]));
@@ -439,50 +442,106 @@ export class World3D {
     legs[0].rotation.x=step;legs[1].rotation.x=-step;
     this.player.position.y+=walking?Math.abs(Math.sin(t*11))*.04:Math.sin(t*2)*.025;
     this.player.userData.rodPivot.rotation.z=walking?Math.sin(t*11)*.028:Math.sin(t*1.9)*.025;
+    // Dizzy: the angler sways and the rod sags.
+    if(this.playerStunned){this.player.rotation.z=Math.sin(t*7)*.14;this.player.userData.rodPivot.rotation.x=.55+Math.sin(t*5)*.1;}
+    else{this.player.rotation.z=0;this.player.userData.rodPivot.rotation.x=0;}
   }
   place(mesh,i,x,y,z,sx=1,sy=1,sz=1,rotZ=0,quat=null){
     const d=this.dummy;d.position.set(x,y,z);d.scale.set(sx,sy,sz);d.rotation.set(0,0,rotZ);
     if(quat)d.quaternion.copy(quat);
     d.updateMatrix();mesh.setMatrixAt(i,d.matrix);
   }
-  updatePeople(t,playerZ){
+  makeWaveVisuals(){
+    const flat=(geometry,color,opacity)=>{
+      const m=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide,depthWrite:false}));
+      m.rotation.x=-Math.PI/2;m.visible=false;this.scene.add(m);return m;
+    };
+    this.waveWarn=flat(new THREE.RingGeometry(.82,1,40),0xff7a63,.8);
+    this.waveHit=flat(new THREE.RingGeometry(.9,1,56),0xf7fbff,.9);
+    this.waveBands=[-1,1].map(()=>flat(new THREE.PlaneGeometry(1,1),0xe8fbff,.7));
+    this.stars=new THREE.InstancedMesh(new THREE.OctahedronGeometry(.13,0),material(0xffe27a,{emissive:0x7a5200,roughness:.3}),99*3);
+    this.stars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.stars.frustumCulled=false;this.scene.add(this.stars);
+  }
+  showWave(w,now=0){
+    const off=!w;
+    this.waveWarn.visible=!off&&w.phase==='warn';
+    this.waveHit.visible=!off&&w.phase==='hit';
+    for(const m of this.waveBands)m.visible=!off&&w.phase==='hit';
+    if(off)return;
+    if(w.phase==='warn'){
+      const p=clamp((now-w.startAt)/(w.hitAt-w.startAt),0,1);
+      this.waveWarn.position.set(w.x,.12,w.z);
+      this.waveWarn.scale.setScalar(1.6+p*1.6+Math.sin(now*14)*.12*p);
+      this.waveWarn.material.opacity=.3+p*.6;
+    }else{
+      const p=clamp((now-w.hitAt)/(w.endAt-w.hitAt),0,1);
+      this.waveHit.position.set(w.x,.14,w.z);
+      this.waveHit.scale.setScalar(1+p*10);
+      this.waveHit.material.opacity=.9*(1-p);
+      [-1,1].forEach((side,i)=>{
+        const m=this.waveBands[i];
+        m.position.set(side*(7.2+p*1.8),.16,w.z);m.scale.set(2.4,13,1);m.material.opacity=.7*(1-p);
+      });
+    }
+  }
+  updatePeople(t,playerZ,dt=.016){
     if(!this.bots)return;
     const P=this.people,lines=this.botLineGeom.attributes.position.array,up=V(0,1,0);
+    const ease=1-Math.exp(-dt*18);
+    const stars=(i,on,x,z)=>{
+      for(let s=0;s<3;s++){
+        if(on){const a=t*6+s*2.09+this.bots[i].seed;this.place(this.stars,i*3+s,x+Math.cos(a)*.42,3.55+Math.sin(t*4+s)*.05,z+Math.sin(a)*.42,1,1,1);}
+        else this.place(this.stars,i*3+s,0,-300-i,0,0,0,0);
+      }
+    };
     for(let i=0;i<this.bots.length;i++){
       const b=this.bots[i],visible=b.alive!==false&&Math.abs(b.z-playerZ)<44;
-      if(!visible){for(const m of Object.values(P))this.place(m,i,0,-200-i,0,0,0,0);
+      if(!visible){
+        for(const m of Object.values(P))this.place(m,i,0,-200-i,0,0,0,0);
         this.place(this.botFloats,i,0,-200-i,0,0,0,0);
+        stars(i,false);
         for(let q=0;q<6;q++)lines[i*6+q]=0;
         continue;
       }
-      const cycle=((t/(7.2+i%5))+b.seed/(Math.PI*2))%1;
-      const walking=cycle<.23,step=walking?Math.sin(t*11+b.seed)*.36:Math.sin(t*2+b.seed)*.05;
-      const x=b.x+Math.sin(t*.42+b.seed)*.24,z=b.z+Math.sin(t*.39+b.seed)*1.14;
-      b.liveX=x;b.liveZ=z;
-      const sway=walking?Math.abs(Math.sin(t*11+b.seed))*.08:Math.sin(t*1.4+b.seed)*.045,turn=b.side;
-      this.place(P.torso,i,x,1.76+sway,z);
-      this.place(P.head,i,x,2.87+sway,z);
-      this.place(P.hat,i,x,3.31+sway,z);
-      this.place(P.brim,i,x,3.17+sway,z);
+      const turn=b.side,stun=b.state==='stun',walking=b.state==='walk';
+      const x=b.liveX??b.x,z=b.liveZ??b.z;
+      if(!b.renderTip)b.renderTip={...b.goalTip};
+      // Ease the rod tip toward the simulated goal so motions look like arm movement, not teleporting.
+      const tp=b.renderTip,g=b.goalTip;
+      tp.x+=(g.x-tp.x)*ease;tp.y+=(g.y-tp.y)*ease;tp.z+=(g.z-tp.z)*ease;
+      const step=walking?Math.sin(t*11+b.seed)*.36:Math.sin(t*2+b.seed)*.05;
+      const sway=walking?Math.abs(Math.sin(t*11+b.seed))*.08:Math.sin(t*1.4+b.seed)*.045;
+      const wobble=stun?Math.sin(t*5+b.seed)*.07:0;
+      const hx=x+wobble;
+      this.place(P.torso,i,hx,1.76+sway,z);
+      this.place(P.head,i,hx,2.87+sway,z+(stun?Math.sin(t*4+b.seed)*.05:0));
+      this.place(P.hat,i,hx,3.31+sway,z);
+      this.place(P.brim,i,hx,3.17+sway,z);
       this.place(P.leftLeg,i,x+step*.13,1.02,z-.23,.17,.83,.17,step);
       this.place(P.rightLeg,i,x-step*.13,1.02,z+.23,.17,.83,.17,-step);
       this.place(P.leftBoot,i,x-turn*.09,.71,z-.24,.37,.22,.48);
       this.place(P.rightBoot,i,x-turn*.09,.71,z+.24,.37,.22,.48);
       this.place(P.arm,i,x-turn*.31,2.09,z+.37,.14,.9,.14,turn*.57);
-      const sweep=cycle>.64&&cycle<.79?Math.sin((cycle-.64)/.15*Math.PI):0;
-      const h=V(x-turn*.63,2.1,z+.3);
-      const tip=V(x-turn*(3.2-sweep*.5),2.95+sweep*1.12+Math.sin(t*1.7+b.seed)*.13,z+1.1-sweep*2.35);
-      const dir=tip.clone().sub(h),mid=h.clone().add(tip).multiplyScalar(.5);
+      const h=V(x-turn*.63,2.1,z+.3),tip=V(tp.x,tp.y,tp.z);
+      const dir=tip.clone().sub(h);if(dir.lengthSq()<1e-4)dir.set(0,1,0);
+      const mid=h.clone().add(tip).multiplyScalar(.5),len=Math.max(.05,dir.length());
       const q=new THREE.Quaternion().setFromUnitVectors(up,dir.clone().normalize());
-      this.place(P.rod,i,mid.x,mid.y,mid.z,1,dir.length()/4.1,1,0,q);
+      this.place(P.rod,i,mid.x,mid.y,mid.z,1,len/4.1,1,0,q);
       this.place(P.reel,i,h.x,h.y-.07,h.z,.8,.8,.8);
-      const float=V(x-turn*(5.5-sweep*.9),.11,z+2.8+Math.sin(t+b.seed)*.7);
       const start=i*6;lines[start]=tip.x;lines[start+1]=tip.y;lines[start+2]=tip.z;
-      lines[start+3]=float.x;lines[start+4]=float.y;lines[start+5]=float.z;
-      this.place(this.botFloats,i,float.x,float.y,float.z,.7,.7,.7);
+      if(b.hasFloat){
+        const f=b.goalFloat;
+        lines[start+3]=f.x;lines[start+4]=f.y;lines[start+5]=f.z;
+        this.place(this.botFloats,i,f.x,f.y,f.z,.7,.7,.7);
+      }else{
+        lines[start+3]=tip.x;lines[start+4]=tip.y;lines[start+5]=tip.z;
+        this.place(this.botFloats,i,0,-200-i,0,0,0,0);
+      }
+      stars(i,stun,x,z);
     }
     for(const m of Object.values(P))m.instanceMatrix.needsUpdate=true;
     this.botFloats.instanceMatrix.needsUpdate=true;
+    this.stars.instanceMatrix.needsUpdate=true;
     this.botLineGeom.attributes.position.needsUpdate=true;
   }
   updateFlow(t,dt,playerZ){
@@ -516,7 +575,10 @@ export class World3D {
     const target=V(playerX*.36,0,playerZ-5);
     this.camTarget.lerp(target,1-Math.exp(-dt*4.2));
     this.camera.position.lerp(this.camTarget.clone().add(this.camOffset),1-Math.exp(-dt*4.2));
-    this.camera.lookAt(this.camTarget);
+    // Brief camera shake after an electric wave hits the bank.
+    const jolt=this.shake;this.shake=Math.max(0,this.shake-dt*1.7);
+    const look=this.camTarget.clone();if(jolt>0){look.x+=(Math.random()-.5)*jolt*.6;look.z+=(Math.random()-.5)*jolt*.6;}
+    this.camera.lookAt(look);
     this.sun.position.set(playerX-24,44,playerZ-36);
     this.sun.target.position.set(playerX,0,playerZ);this.sun.target.updateMatrixWorld();
   }
